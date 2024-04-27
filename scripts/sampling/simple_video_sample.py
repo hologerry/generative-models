@@ -1,24 +1,64 @@
 import math
 import os
 import sys
+
 from glob import glob
 from pathlib import Path
 from typing import List, Optional
 
-sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), "../../")))
 import cv2
 import imageio
+import lovely_tensors as lt
 import numpy as np
 import torch
+import torchvision.transforms.functional as TF
+
 from einops import rearrange, repeat
 from fire import Fire
 from omegaconf import OmegaConf
 from PIL import Image
 from rembg import remove
-from scripts.util.detection.nsfw_and_watermark_dectection import DeepFloydDataFiltering
+
+
+sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), "../../")))
+
+
+from scripts.util.detection.nsfw_and_watermark_detection import DeepFloydDataFiltering
 from sgm.inference.helpers import embed_watermark
 from sgm.util import default, instantiate_from_config
-from torchvision.transforms import ToTensor
+
+
+def resize_image(image, output_size=(1024, 576)):
+    # Calculate aspect ratios
+    target_aspect = output_size[0] / output_size[1]  # Aspect ratio of the desired size
+    image_aspect = image.width / image.height  # Aspect ratio of the original image
+
+    # Resize then crop if the original image is larger
+    if image_aspect > target_aspect:
+        # Resize the image to match the target height, maintaining aspect ratio
+        new_height = output_size[1]
+        new_width = int(new_height * image_aspect)
+        resized_image = image.resize((new_width, new_height), Image.LANCZOS)
+        # Calculate coordinates for cropping
+        left = (new_width - output_size[0]) / 2
+        top = 0
+        right = (new_width + output_size[0]) / 2
+        bottom = output_size[1]
+    else:
+        # Resize the image to match the target width, maintaining aspect ratio
+        new_width = output_size[0]
+        new_height = int(new_width / image_aspect)
+        resized_image = image.resize((new_width, new_height), Image.LANCZOS)
+        # Calculate coordinates for cropping
+        left = 0
+        top = (new_height - output_size[1]) / 2
+        right = output_size[0]
+        bottom = (new_height + output_size[1]) / 2
+
+    # Crop the image
+    cropped_image = resized_image.crop((left, top, right, bottom))
+
+    return cropped_image
 
 
 def sample(
@@ -30,7 +70,7 @@ def sample(
     motion_bucket_id: int = 127,
     cond_aug: float = 0.02,
     seed: int = 23,
-    decoding_t: int = 14,  # Number of frames decoded at a time! This eats most VRAM. Reduce if necessary.
+    decoding_t: int = 7,  # Number of frames decoded at a time! This eats most VRAM. Reduce if necessary.
     device: str = "cuda",
     output_folder: Optional[str] = None,
     elevations_deg: Optional[float | List[float]] = 10.0,  # For SV3D
@@ -53,19 +93,20 @@ def sample(
         num_steps = default(num_steps, 30)
         output_folder = default(output_folder, "outputs/simple_video_sample/svd_xt/")
         model_config = "scripts/sampling/configs/svd_xt.yaml"
+    elif version == "svd_xt_1_1":
+        num_frames = default(num_frames, 25)
+        num_steps = default(num_steps, 30)
+        output_folder = default(output_folder, "outputs/simple_video_sample/svd_xt_1_1/")
+        model_config = "scripts/sampling/configs/svd_xt_1_1.yaml"
     elif version == "svd_image_decoder":
         num_frames = default(num_frames, 14)
         num_steps = default(num_steps, 25)
-        output_folder = default(
-            output_folder, "outputs/simple_video_sample/svd_image_decoder/"
-        )
+        output_folder = default(output_folder, "outputs/simple_video_sample/svd_image_decoder/")
         model_config = "scripts/sampling/configs/svd_image_decoder.yaml"
     elif version == "svd_xt_image_decoder":
         num_frames = default(num_frames, 25)
         num_steps = default(num_steps, 30)
-        output_folder = default(
-            output_folder, "outputs/simple_video_sample/svd_xt_image_decoder/"
-        )
+        output_folder = default(output_folder, "outputs/simple_video_sample/svd_xt_image_decoder/")
         model_config = "scripts/sampling/configs/svd_xt_image_decoder.yaml"
     elif version == "sv3d_u":
         num_frames = 21
@@ -113,11 +154,7 @@ def sample(
             raise ValueError("Path is not valid image file.")
     elif path.is_dir():
         all_img_paths = sorted(
-            [
-                f
-                for f in path.iterdir()
-                if f.is_file() and f.suffix.lower() in [".jpg", ".jpeg", ".png"]
-            ]
+            [f for f in path.iterdir() if f.is_file() and f.suffix.lower() in [".jpg", ".jpeg", ".png"]]
         )
         if len(all_img_paths) == 0:
             raise ValueError("Folder does not contain any images.")
@@ -134,19 +171,13 @@ def sample(
                 image.thumbnail([768, 768], Image.Resampling.LANCZOS)
                 image = remove(image.convert("RGBA"), alpha_matting=True)
 
-            # resize object in frame
+            # resize object in frame put object in center of frame
             image_arr = np.array(image)
             in_w, in_h = image_arr.shape[:2]
-            ret, mask = cv2.threshold(
-                np.array(image.split()[-1]), 0, 255, cv2.THRESH_BINARY
-            )
+            ret, mask = cv2.threshold(np.array(image.split()[-1]), 0, 255, cv2.THRESH_BINARY)
             x, y, w, h = cv2.boundingRect(mask)
             max_size = max(w, h)
-            side_len = (
-                int(max_size / image_frame_ratio)
-                if image_frame_ratio is not None
-                else in_w
-            )
+            side_len = int(max_size / image_frame_ratio) if image_frame_ratio is not None else in_w
             padded_image = np.zeros((side_len, side_len, 4), dtype=np.uint8)
             center = side_len // 2
             padded_image[
@@ -162,9 +193,9 @@ def sample(
 
         else:
             with Image.open(input_img_path) as image:
-                if image.mode == "RGBA":
-                    input_image = image.convert("RGB")
-                w, h = image.size
+                input_image = image.convert("RGB")
+                input_image = resize_image(input_image)
+                w, h = input_image.size
 
                 if h % 64 != 0 or w % 64 != 0:
                     width, height = map(lambda x: x - x % 64, (w, h))
@@ -173,7 +204,9 @@ def sample(
                         f"WARNING: Your image is of size {h}x{w} which is not divisible by 64. We are resizing to {height}x{width}!"
                     )
 
-        image = ToTensor()(input_image)
+
+        image = TF.to_tensor(input_image)
+
         image = image * 2.0 - 1.0
 
         image = image.unsqueeze(0).to(device)
@@ -191,9 +224,7 @@ def sample(
                 "WARNING: The conditioning frame you provided is not 576x576. This leads to suboptimal performance as model was only trained on 576x576."
             )
         if motion_bucket_id > 255:
-            print(
-                "WARNING: High motion bucket! This may lead to suboptimal performance."
-            )
+            print("WARNING: High motion bucket! This may lead to suboptimal performance.")
 
         if fps_id < 5:
             print("WARNING: Small fps value! This may lead to suboptimal performance.")
@@ -238,15 +269,11 @@ def sample(
                 randn = torch.randn(shape, device=device)
 
                 additional_model_inputs = {}
-                additional_model_inputs["image_only_indicator"] = torch.zeros(
-                    2, num_frames
-                ).to(device)
+                additional_model_inputs["image_only_indicator"] = torch.zeros(2, num_frames).to(device)
                 additional_model_inputs["num_video_frames"] = batch["num_video_frames"]
 
                 def denoiser(input, sigma, c):
-                    return model.denoiser(
-                        model.model, input, sigma, c, **additional_model_inputs
-                    )
+                    return model.denoiser(model.model, input, sigma, c, **additional_model_inputs)
 
                 samples_z = model.sampler(denoiser, randn, cond=c, uc=uc)
                 model.en_and_decode_n_samples_a_time = decoding_t
@@ -258,20 +285,23 @@ def sample(
                 os.makedirs(output_folder, exist_ok=True)
                 base_count = len(glob(os.path.join(output_folder, "*.mp4")))
 
-                imageio.imwrite(
-                    os.path.join(output_folder, f"{base_count:06d}.jpg"), input_image
-                )
+                input_image.save(os.path.join(output_folder, f"{base_count:06d}_input.jpg"))
 
-                samples = embed_watermark(samples)
-                samples = filter(samples)
-                vid = (
-                    (rearrange(samples, "t c h w -> t h w c") * 255)
-                    .cpu()
-                    .numpy()
-                    .astype(np.uint8)
-                )
                 video_path = os.path.join(output_folder, f"{base_count:06d}.mp4")
-                imageio.mimwrite(video_path, vid)
+
+                vid = (rearrange(samples, "t c h w -> t h w c") * 255).cpu().numpy().astype(np.uint8)
+
+                writer = imageio.get_writer(video_path, fps=fps_id + 1)
+
+                video_frame_path = os.path.join(output_folder, "frames")
+                os.makedirs(video_frame_path, exist_ok=True)
+                for i in range(num_frames):
+                    imageio.imwrite(
+                        os.path.join(video_frame_path, f"{base_count:06d}_{i:02d}.jpg"),
+                        vid[i],
+                    )
+                    writer.append_data(vid[i])
+                writer.close()
 
 
 def get_unique_embedder_keys_from_conditioner(conditioner):
@@ -284,17 +314,9 @@ def get_batch(keys, value_dict, N, T, device):
 
     for key in keys:
         if key == "fps_id":
-            batch[key] = (
-                torch.tensor([value_dict["fps_id"]])
-                .to(device)
-                .repeat(int(math.prod(N)))
-            )
+            batch[key] = torch.tensor([value_dict["fps_id"]]).to(device).repeat(int(math.prod(N)))
         elif key == "motion_bucket_id":
-            batch[key] = (
-                torch.tensor([value_dict["motion_bucket_id"]])
-                .to(device)
-                .repeat(int(math.prod(N)))
-            )
+            batch[key] = torch.tensor([value_dict["motion_bucket_id"]]).to(device).repeat(int(math.prod(N)))
         elif key == "cond_aug":
             batch[key] = repeat(
                 torch.tensor([value_dict["cond_aug"]]).to(device),
@@ -332,9 +354,7 @@ def load_model(
 
     config.model.params.sampler_config.params.verbose = verbose
     config.model.params.sampler_config.params.num_steps = num_steps
-    config.model.params.sampler_config.params.guider_config.params.num_frames = (
-        num_frames
-    )
+    config.model.params.sampler_config.params.guider_config.params.num_frames = num_frames
     if device == "cuda":
         with torch.device(device):
             model = instantiate_from_config(config.model).to(device).eval()
@@ -346,4 +366,5 @@ def load_model(
 
 
 if __name__ == "__main__":
+    lt.monkey_patch()
     Fire(sample)

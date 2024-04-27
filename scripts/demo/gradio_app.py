@@ -2,11 +2,13 @@
 import os
 import sys
 
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "generative-models"))
 
 import math
 import random
 import uuid
+
 from glob import glob
 from pathlib import Path
 from typing import Optional
@@ -15,6 +17,7 @@ import cv2
 import gradio as gr
 import numpy as np
 import torch
+
 from einops import rearrange, repeat
 from fire import Fire
 from huggingface_hub import hf_hub_download
@@ -27,9 +30,10 @@ from scripts.sampling.simple_video_sample import (
     get_unique_embedder_keys_from_conditioner,
     load_model,
 )
-from scripts.util.detection.nsfw_and_watermark_dectection import DeepFloydDataFiltering
+from scripts.util.detection.nsfw_and_watermark_detection import DeepFloydDataFiltering
 from sgm.inference.helpers import embed_watermark
 from sgm.util import default, instantiate_from_config
+
 
 # To download all svd models
 # hf_hub_download(repo_id="stabilityai/stable-video-diffusion-img2vid-xt", filename="svd_xt.safetensors", local_dir="checkpoints")
@@ -103,11 +107,7 @@ def sample(
             raise ValueError("Path is not valid image file.")
     elif path.is_dir():
         all_img_paths = sorted(
-            [
-                f
-                for f in path.iterdir()
-                if f.is_file() and f.suffix.lower() in [".jpg", ".jpeg", ".png"]
-            ]
+            [f for f in path.iterdir() if f.is_file() and f.suffix.lower() in [".jpg", ".jpeg", ".png"]]
         )
         if len(all_img_paths) == 0:
             raise ValueError("Folder does not contain any images.")
@@ -141,9 +141,7 @@ def sample(
                 "WARNING: The conditioning frame you provided is not 576x1024. This leads to suboptimal performance as model was only trained on 576x1024. Consider increasing `cond_aug`."
             )
         if motion_bucket_id > 255:
-            print(
-                "WARNING: High motion bucket! This may lead to suboptimal performance."
-            )
+            print("WARNING: High motion bucket! This may lead to suboptimal performance.")
 
         if fps_id < 5:
             print("WARNING: Small fps value! This may lead to suboptimal performance.")
@@ -186,15 +184,11 @@ def sample(
                 randn = torch.randn(shape, device=device)
 
                 additional_model_inputs = {}
-                additional_model_inputs["image_only_indicator"] = torch.zeros(
-                    2, num_frames
-                ).to(device)
+                additional_model_inputs["image_only_indicator"] = torch.zeros(2, num_frames).to(device)
                 additional_model_inputs["num_video_frames"] = batch["num_video_frames"]
 
                 def denoiser(input, sigma, c):
-                    return model.denoiser(
-                        model.model, input, sigma, c, **additional_model_inputs
-                    )
+                    return model.denoiser(model.model, input, sigma, c, **additional_model_inputs)
 
                 samples_z = model.sampler(denoiser, randn, cond=c, uc=uc)
                 model.en_and_decode_n_samples_a_time = decoding_t
@@ -206,19 +200,14 @@ def sample(
                 video_path = os.path.join(output_folder, f"{base_count:06d}.mp4")
                 writer = cv2.VideoWriter(
                     video_path,
-                    cv2.VideoWriter_fourcc(*"mp4v"),
+                    cv2.VideoWriter_fourcc(*"mp4v"),  # gr.Video() will automatically convert to mp4, x264
                     fps_id + 1,
                     (samples.shape[-1], samples.shape[-2]),
                 )
 
                 samples = embed_watermark(samples)
                 samples = filter(samples)
-                vid = (
-                    (rearrange(samples, "t c h w -> t h w c") * 255)
-                    .cpu()
-                    .numpy()
-                    .astype(np.uint8)
-                )
+                vid = (rearrange(samples, "t c h w -> t h w c") * 255).cpu().numpy().astype(np.uint8)
                 for frame in vid:
                     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                     writer.write(frame)
@@ -258,6 +247,8 @@ def resize_image(image_path, output_size=(1024, 576)):
     # Crop the image
     cropped_image = resized_image.crop((left, top, right, bottom))
 
+    print(f"Resized and cropped image to {output_size} pixels.")
+    cropped_image.save("gradio_image_cropped_image.png")
     return cropped_image
 
 
