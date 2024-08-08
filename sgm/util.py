@@ -1,12 +1,14 @@
 import functools
 import importlib
 import os
+
 from functools import partial
 from inspect import isfunction
 
 import fsspec
 import numpy as np
 import torch
+
 from PIL import Image, ImageDraw, ImageFont
 from safetensors.torch import load_file as load_safetensors
 
@@ -79,9 +81,7 @@ def log_txt_as_img(wh, xc, size=10):
             text_seq = xc[bi][0]
         else:
             text_seq = xc[bi]
-        lines = "\n".join(
-            text_seq[start : start + nc] for start in range(0, len(text_seq), nc)
-        )
+        lines = "\n".join(text_seq[start : start + nc] for start in range(0, len(text_seq), nc))
 
         try:
             draw.text((0, 0), lines, fill="black", font=font)
@@ -193,9 +193,7 @@ def append_dims(x, target_dims):
     """Appends dimensions to the end of a tensor until it has target_dims dimensions."""
     dims_to_append = target_dims - x.ndim
     if dims_to_append < 0:
-        raise ValueError(
-            f"input has {x.ndim} dims but target_dims is {target_dims}, which is less"
-        )
+        raise ValueError(f"input has {x.ndim} dims but target_dims is {target_dims}, which is less")
     return x[(...,) + (None,) * dims_to_append]
 
 

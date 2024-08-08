@@ -11,9 +11,7 @@ RESOURCES_ROOT = "scripts/util/detection/"
 
 def predict_proba(X, weights, biases):
     logits = X @ weights.T + biases
-    proba = np.where(
-        logits >= 0, 1 / (1 + np.exp(-logits)), np.exp(logits) / (1 + np.exp(logits))
-    )
+    proba = np.where(logits >= 0, 1 / (1 + np.exp(-logits)), np.exp(logits) / (1 + np.exp(logits)))
     return proba.T
 
 
@@ -37,21 +35,15 @@ def clip_process_images(images: torch.Tensor) -> torch.Tensor:
 
 
 class DeepFloydDataFiltering(object):
-    def __init__(
-        self, verbose: bool = False, device: torch.device = torch.device("cpu")
-    ):
+    def __init__(self, verbose: bool = False, device: torch.device = torch.device("cpu")):
         super().__init__()
         self.verbose = verbose
         self._device = None
         self.clip_model, _ = clip.load("ViT-L/14", device=device)
         self.clip_model.eval()
 
-        self.cpu_w_weights, self.cpu_w_biases = load_model_weights(
-            os.path.join(RESOURCES_ROOT, "w_head_v1.npz")
-        )
-        self.cpu_p_weights, self.cpu_p_biases = load_model_weights(
-            os.path.join(RESOURCES_ROOT, "p_head_v1.npz")
-        )
+        self.cpu_w_weights, self.cpu_w_biases = load_model_weights(os.path.join(RESOURCES_ROOT, "w_head_v1.npz"))
+        self.cpu_p_weights, self.cpu_p_biases = load_model_weights(os.path.join(RESOURCES_ROOT, "p_head_v1.npz"))
         self.w_threshold, self.p_threshold = 0.5, 0.5
 
     @torch.inference_mode()
@@ -95,12 +87,8 @@ def test(root):
         print(f"running on {p}...")
         img = load_img(os.path.join(root, p))
         filtered_img = filter(img)
-        filtered_img = rearrange(
-            255.0 * (filtered_img.numpy())[0], "c h w -> h w c"
-        ).astype(np.uint8)
-        Image.fromarray(filtered_img).save(
-            os.path.join(root, f"{os.path.splitext(p)[0]}-filtered.jpg")
-        )
+        filtered_img = rearrange(255.0 * (filtered_img.numpy())[0], "c h w -> h w c").astype(np.uint8)
+        Image.fromarray(filtered_img).save(os.path.join(root, f"{os.path.splitext(p)[0]}-filtered.jpg"))
 
 
 if __name__ == "__main__":

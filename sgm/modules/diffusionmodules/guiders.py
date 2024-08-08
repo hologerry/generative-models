@@ -1,11 +1,14 @@
 import logging
+
 from abc import ABC, abstractmethod
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import torch
+
 from einops import rearrange, repeat
 
 from ...util import append_dims, default
+
 
 logpy = logging.getLogger(__name__)
 
@@ -15,9 +18,7 @@ class Guider(ABC):
     def __call__(self, x: torch.Tensor, sigma: float) -> torch.Tensor:
         pass
 
-    def prepare_inputs(
-        self, x: torch.Tensor, s: float, c: Dict, uc: Dict
-    ) -> Tuple[torch.Tensor, float, Dict]:
+    def prepare_inputs(self, x: torch.Tensor, s: float, c: Dict, uc: Dict) -> Tuple[torch.Tensor, float, Dict]:
         pass
 
 
@@ -46,9 +47,7 @@ class IdentityGuider(Guider):
     def __call__(self, x: torch.Tensor, sigma: float) -> torch.Tensor:
         return x
 
-    def prepare_inputs(
-        self, x: torch.Tensor, s: float, c: Dict, uc: Dict
-    ) -> Tuple[torch.Tensor, float, Dict]:
+    def prepare_inputs(self, x: torch.Tensor, s: float, c: Dict, uc: Dict) -> Tuple[torch.Tensor, float, Dict]:
         c_out = dict()
 
         for k in c:
@@ -152,7 +151,7 @@ class TrapezoidPredictionGuider(LinearPredictionGuider):
             ]
         ).unsqueeze(0)
 
-        
+
 class SpatiotemporalPredictionGuider(LinearPredictionGuider):
     def __init__(
         self,
@@ -166,8 +165,8 @@ class SpatiotemporalPredictionGuider(LinearPredictionGuider):
         V = num_views
         T = num_frames // V
         scale = torch.zeros(num_frames).view(T, V)
-        scale += torch.linspace(0, 1, T)[:,None] * 0.5
-        scale += self.triangle_wave(torch.linspace(0, 1, V))[None,:] * 0.5
+        scale += torch.linspace(0, 1, T)[:, None] * 0.5
+        scale += self.triangle_wave(torch.linspace(0, 1, V))[None, :] * 0.5
         scale = scale.flatten()
         self.scale = (scale * (max_scale - min_scale) + min_scale).unsqueeze(0)
 

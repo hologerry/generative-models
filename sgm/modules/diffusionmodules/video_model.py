@@ -1,17 +1,19 @@
+import functools
+
 from functools import partial
 from typing import List, Optional, Union
 
-from einops import rearrange
+from einops import rearrange, repeat
 
 from ...modules.diffusionmodules.openaimodel import *
-from ...modules.video_attention import SpatialVideoTransformer
 from ...modules.spacetime_attention import (
     BasicTransformerTimeMixBlock,
     PostHocSpatialTransformerWithTimeMixing,
-    PostHocSpatialTransformerWithTimeMixingAndMotion
+    PostHocSpatialTransformerWithTimeMixingAndMotion,
 )
+from ...modules.video_attention import SpatialVideoTransformer
 from ...util import default
-from .util import AlphaBlender # , LegacyAlphaBlenderWithBug, get_alpha
+from .util import AlphaBlender, get_alpha  # , LegacyAlphaBlenderWithBug, get_alpha
 
 
 class VideoResBlock(ResBlock):
@@ -76,12 +78,8 @@ class VideoResBlock(ResBlock):
         x_mix = rearrange(x, "(b t) c h w -> b c t h w", t=num_video_frames)
         x = rearrange(x, "(b t) c h w -> b c t h w", t=num_video_frames)
 
-        x = self.time_stack(
-            x, rearrange(emb, "(b t) ... -> b t ...", t=num_video_frames)
-        )
-        x = self.time_mixer(
-            x_spatial=x_mix, x_temporal=x, image_only_indicator=image_only_indicator
-        )
+        x = self.time_stack(x, rearrange(emb, "(b t) ... -> b t ...", t=num_video_frames))
+        x = self.time_mixer(x_spatial=x_mix, x_temporal=x, image_only_indicator=image_only_indicator)
         x = rearrange(x, "b c t h w -> (b t) c h w")
         return x
 
@@ -138,9 +136,7 @@ class VideoUNet(nn.Module):
         self.out_channels = out_channels
         if isinstance(transformer_depth, int):
             transformer_depth = len(channel_mult) * [transformer_depth]
-        transformer_depth_middle = default(
-            transformer_depth_middle, transformer_depth[-1]
-        )
+        transformer_depth_middle = default(transformer_depth_middle, transformer_depth[-1])
 
         self.num_res_blocks = num_res_blocks
         self.attention_resolutions = attention_resolutions
@@ -189,11 +185,7 @@ class VideoUNet(nn.Module):
                 raise ValueError()
 
         self.input_blocks = nn.ModuleList(
-            [
-                TimestepEmbedSequential(
-                    conv_nd(dims, in_channels, model_channels, 3, padding=1)
-                )
-            ]
+            [TimestepEmbedSequential(conv_nd(dims, in_channels, model_channels, 3, padding=1))]
         )
         self._feature_size = model_channels
         input_block_chans = [model_channels]
@@ -552,9 +544,7 @@ class PostHocAttentionBlockWithTimeMixing(AttentionBlock):
         if merge_strategy == "fixed":
             self.register_buffer("mix_factor", th.Tensor([merge_factor]))
         elif merge_strategy == "learned" or merge_strategy == "learned_with_images":
-            self.register_parameter(
-                "mix_factor", th.nn.Parameter(th.Tensor([merge_factor]))
-            )
+            self.register_parameter("mix_factor", th.nn.Parameter(th.Tensor([merge_factor])))
         elif merge_strategy == "fixed_with_images":
             self.mix_factor = None
         else:
@@ -602,9 +592,7 @@ class PostHocAttentionBlockWithTimeMixing(AttentionBlock):
         emb = emb[:, None, :]
         x_mix = x_mix + emb
 
-        x_mix = self.time_mix_blocks[0](
-            x_mix, context=time_context, timesteps=timesteps
-        )
+        x_mix = self.time_mix_blocks[0](x_mix, context=time_context, timesteps=timesteps)
 
         alpha = self.get_alpha_fn(image_only_indicator=image_only_indicator)
         x = alpha * x + (1.0 - alpha) * x_mix
@@ -664,9 +652,7 @@ class PostHocResBlockWithTime(ResBlock):
             if merge_strategy == "fixed":
                 self.register_buffer("mix_factor", th.Tensor([merge_factor]))
             elif merge_strategy == "learned" or merge_strategy == "learned_with_images":
-                self.register_parameter(
-                    "mix_factor", th.nn.Parameter(th.Tensor([merge_factor]))
-                )
+                self.register_parameter("mix_factor", th.nn.Parameter(th.Tensor([merge_factor])))
             elif merge_strategy == "fixed_with_images":
                 self.mix_factor = None
             else:
@@ -679,7 +665,7 @@ class PostHocResBlockWithTime(ResBlock):
                 apply_sigmoid=apply_sigmoid_to_merge,
             )
         else:
-            if False: # replicate_bug:
+            if False:  # replicate_bug:
                 logpy.warning(
                     "*****************************************************************************************\n"
                     "GRAVE WARNING: YOU'RE USING THE BUGGY LEGACY ALPHABLENDER!!! ARE YOU SURE YOU WANT THIS?!\n"
@@ -711,17 +697,13 @@ class PostHocResBlockWithTime(ResBlock):
         x_mix = rearrange(x, "(b t) c h w -> b c t h w", t=num_video_frames)
         x = rearrange(x, "(b t) c h w -> b c t h w", t=num_video_frames)
 
-        x = self.time_mix_blocks(
-            x, rearrange(emb, "(b t) ... -> b t ...", t=num_video_frames)
-        )
+        x = self.time_mix_blocks(x, rearrange(emb, "(b t) ... -> b t ...", t=num_video_frames))
 
         if self.time_mix_legacy:
             alpha = self.get_alpha_fn(image_only_indicator=image_only_indicator)
             x = alpha.to(x.dtype) * x + (1.0 - alpha).to(x.dtype) * x_mix
         else:
-            x = self.time_mixer(
-                x_spatial=x_mix, x_temporal=x, image_only_indicator=image_only_indicator
-            )
+            x = self.time_mixer(x_spatial=x_mix, x_temporal=x, image_only_indicator=image_only_indicator)
         x = rearrange(x, "b c t h w -> (b t) c h w")
         return x
 
@@ -790,9 +772,7 @@ class SpatialUNetModelWithTime(nn.Module):
         self.out_channels = out_channels
         if isinstance(transformer_depth, int):
             transformer_depth = len(channel_mult) * [transformer_depth]
-        transformer_depth_middle = default(
-            transformer_depth_middle, transformer_depth[-1]
-        )
+        transformer_depth_middle = default(transformer_depth_middle, transformer_depth[-1])
 
         self.num_res_blocks = num_res_blocks
         self.attention_resolutions = attention_resolutions
@@ -842,11 +822,7 @@ class SpatialUNetModelWithTime(nn.Module):
                 raise ValueError()
 
         self.input_blocks = nn.ModuleList(
-            [
-                TimestepEmbedSequential(
-                    conv_nd(dims, in_channels, model_channels, 3, padding=1)
-                )
-            ]
+            [TimestepEmbedSequential(conv_nd(dims, in_channels, model_channels, 3, padding=1))]
         )
         self._feature_size = model_channels
         input_block_chans = [model_channels]
@@ -899,7 +875,7 @@ class SpatialUNetModelWithTime(nn.Module):
                     time_mix_legacy=time_mix_legacy,
                     max_time_embed_period=max_ddpm_temb_period,
                 )
-            
+
             else:
                 return PostHocSpatialTransformerWithTimeMixing(
                     ch,
@@ -990,11 +966,7 @@ class SpatialUNetModelWithTime(nn.Module):
                         num_heads = ch // num_head_channels
                         dim_head = num_head_channels
                     if legacy:
-                        dim_head = (
-                            ch // num_heads
-                            if use_spatial_transformer
-                            else num_head_channels
-                        )
+                        dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
 
                     layers.append(
                         get_attention_layer(
@@ -1114,11 +1086,7 @@ class SpatialUNetModelWithTime(nn.Module):
                         num_heads = ch // num_head_channels
                         dim_head = num_head_channels
                     if legacy:
-                        dim_head = (
-                            ch // num_heads
-                            if use_spatial_transformer
-                            else num_head_channels
-                        )
+                        dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
 
                     layers.append(
                         get_attention_layer(
@@ -1185,15 +1153,15 @@ class SpatialUNetModelWithTime(nn.Module):
             self.num_classes is not None
         ), "must specify y if and only if the model is class-conditional -> no, relax this TODO"
         hs = []
-        t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False) # 21 x 320
-        emb = self.time_embed(t_emb) # 21 x 1280
+        t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)  # 21 x 320
+        emb = self.time_embed(t_emb)  # 21 x 1280
         time = str(timesteps[0].data.cpu().numpy())
 
         if self.num_classes is not None:
             assert y.shape[0] == x.shape[0]
-            emb = emb + self.label_emb(y) # 21 x 1280
+            emb = emb + self.label_emb(y)  # 21 x 1280
 
-        h = x # 21 x 8 x 64 x 64
+        h = x  # 21 x 8 x 64 x 64
         for i, module in enumerate(self.input_blocks):
             h = module(
                 h,
@@ -1206,7 +1174,7 @@ class SpatialUNetModelWithTime(nn.Module):
                 time_context=time_context,
                 num_video_frames=num_video_frames,
                 time_step=time_step,
-                name='encoder_{}_{}'.format(time, i)
+                name="encoder_{}_{}".format(time, i),
             )
             hs.append(h)
         h = self.middle_block(
@@ -1220,7 +1188,7 @@ class SpatialUNetModelWithTime(nn.Module):
             time_context=time_context,
             num_video_frames=num_video_frames,
             time_step=time_step,
-            name='middle_{}_0'.format(time, i)
+            name="middle_{}_0".format(time, i),
         )
         for i, module in enumerate(self.output_blocks):
             h = th.cat([h, hs.pop()], dim=1)
@@ -1235,7 +1203,7 @@ class SpatialUNetModelWithTime(nn.Module):
                 time_context=time_context,
                 num_video_frames=num_video_frames,
                 time_step=time_step,
-                name='decoder_{}_{}'.format(time, i)
+                name="decoder_{}_{}".format(time, i),
             )
         h = h.type(x.dtype)
         return self.out(h)

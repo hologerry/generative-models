@@ -59,17 +59,11 @@ MATCH_VALUES = [
     [33, "Partial watermark match. Cannot determine with certainty."],
     [
         35,
-        (
-            "Likely watermarked. In our test 0.02% of real images were "
-            'falsely detected as "Likely watermarked"'
-        ),
+        ("Likely watermarked. In our test 0.02% of real images were " 'falsely detected as "Likely watermarked"'),
     ],
     [
         49,
-        (
-            "Very likely watermarked. In our test no real images were "
-            'falsely detected as "Very likely watermarked"'
-        ),
+        ("Very likely watermarked. In our test no real images were " 'falsely detected as "Very likely watermarked"'),
     ],
 ]
 

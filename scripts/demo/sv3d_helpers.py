@@ -19,18 +19,14 @@ def generate_dynamic_cycle_xy_values(
         frequency = np.random.randint(*frequency_range) * (2 * np.pi / length)
         amplitude = np.random.uniform(*amplitude_range)
         phase_shift = np.random.choice([0, np.pi])  # np.random.uniform(0, 2 * np.pi)
-        angles = (
-            np.linspace(0, frequency * length, length, endpoint=False) + phase_shift
-        )
+        angles = np.linspace(0, frequency * length, length, endpoint=False) + phase_shift
         y_sequence += np.sin(angles) * amplitude
     # X values generation
     # Generate length - 1 steps since the last step is back to start
     steps = np.random.uniform(*step_range, length - 1)
     total_step_sum = np.sum(steps)
     # Calculate the scale factor to scale total steps to just under 360
-    scale_factor = (
-        360 - ((360 / length) * np.random.uniform(*step_range))
-    ) / total_step_sum
+    scale_factor = (360 - ((360 / length) * np.random.uniform(*step_range))) / total_step_sum
     # Apply the scale factor and generate the sequence of X values
     x_values = np.cumsum(steps * scale_factor)
     # Ensure the sequence starts at 0 and add the final step to complete the loop
@@ -59,9 +55,7 @@ def smooth_data(data, window_size):
 def gen_dynamic_loop(length=21, elev_deg=0):
     while True:
         # Generate the combined X and Y values using the new function
-        azim_values, elev_values = generate_dynamic_cycle_xy_values(
-            length=84, init_elev=elev_deg
-        )
+        azim_values, elev_values = generate_dynamic_cycle_xy_values(length=84, init_elev=elev_deg)
         # Smooth the Y values directly
         smoothed_elev_values = smooth_data(elev_values, 5)
         max_magnitude = np.max(np.abs(smoothed_elev_values))
@@ -90,9 +84,7 @@ def plot_3D(azim, polar, save_path, dynamic=True):
     xs_d, ys_d, zs_d = (xs[1:] - xs[:-1]), (ys[1:] - ys[:-1]), (zs[1:] - zs[:-1])
     for i in range(len(xs) - 1):
         if dynamic:
-            ax.quiver(
-                xs[i], ys[i], zs[i], xs_d[i], ys_d[i], zs_d[i], lw=2, color=col_line[i]
-            )
+            ax.quiver(xs[i], ys[i], zs[i], xs_d[i], ys_d[i], zs_d[i], lw=2, color=col_line[i])
         else:
             ax.plot(xs[i : i + 2], ys[i : i + 2], zs[i : i + 2], lw=2, c=col_line[i])
         ax.scatter(xs[i + 1], ys[i + 1], zs[i + 1], s=100, color=col[i + 1])

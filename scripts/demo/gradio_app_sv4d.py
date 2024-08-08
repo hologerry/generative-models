@@ -64,9 +64,7 @@ H, W = 576, 576
 n_frames = 21  # number of input and output video frames
 n_views = V + 1  # number of output video views (1 input view + 8 novel views)
 n_views_sv3d = 21
-subsampled_views = np.array(
-    [0, 2, 5, 7, 9, 12, 14, 16, 19]
-)  # subsample (V+1=)9 (uniform) views from 21 SV3D views
+subsampled_views = np.array([0, 2, 5, 7, 9, 12, 14, 16, 19])  # subsample (V+1=)9 (uniform) views from 21 SV3D views
 
 version_dict = {
     "T": T * V,
@@ -88,9 +86,7 @@ version_dict = {
             "cond_view",
             "cond_motion",
         ],
-        "additional_guider_kwargs": {
-            "additional_cond_keys": ["cond_view", "cond_motion"]
-        },
+        "additional_guider_kwargs": {"additional_cond_keys": ["cond_view", "cond_motion"]},
     },
 }
 
@@ -136,6 +132,7 @@ sv3d_model, filter = load_model(
 sv3d_model = initial_model_load(sv3d_model)
 # ------------------
 
+
 def sample_anchor(
     input_path: str = "assets/test_image.png",  # Can either be image file or folder with image files
     seed: Optional[int] = None,
@@ -180,9 +177,7 @@ def sample_anchor(
         len(azimuths_deg) == n_views_sv3d
     ), f"Please provide a list of {n_views_sv3d} values for azimuths_deg! Given {len(azimuths_deg)}"
     polars_rad = np.array([np.deg2rad(90 - e) for e in elevations_deg])
-    azimuths_rad = np.array(
-        [np.deg2rad((a - azimuths_deg[-1]) % 360) for a in azimuths_deg]
-    )
+    azimuths_rad = np.array([np.deg2rad((a - azimuths_deg[-1]) % 360) for a in azimuths_deg])
 
     # Sample multi-view images of the first frame using SV3D i.e. images at time 0
     sv3d_model.sampler.num_steps = num_steps
@@ -206,7 +201,7 @@ def sample_anchor(
 
     sv3d_file = os.path.join(output_folder, "t000.mp4")
     save_video(sv3d_file, images_t0.unsqueeze(1))
-    
+
     for emb in model.conditioner.embedders:
         if isinstance(emb, VideoPredictionEmbedderWithEncoder):
             emb.en_and_decode_n_samples_a_time = encoding_t
@@ -231,9 +226,7 @@ def sample_anchor(
     azims = (azims - azimuths_rad[v0]) % (torch.pi * 2)
     model.sampler.num_steps = num_steps
     version_dict["options"]["num_steps"] = num_steps
-    samples = run_img2vid(
-        version_dict, model, image, seed, polars, azims, cond_motion, cond_view, decoding_t
-    )
+    samples = run_img2vid(version_dict, model, image, seed, polars, azims, cond_motion, cond_view, decoding_t)
     samples = samples.view(T, V, 3, H, W)
     for i, t in enumerate(frame_indices):
         for j, v in enumerate(view_indices):
@@ -249,7 +242,7 @@ def sample_anchor(
     anchor_vis_file = os.path.join(output_folder, "anchor_vis.mp4")
     save_video(anchor_vis_file, grid_list, fps=3)
     anchor_file = os.path.join(output_folder, "anchor.mp4")
-    image_list = samples.view(T*V, 3, H, W).unsqueeze(1) * 2 - 1
+    image_list = samples.view(T * V, 3, H, W).unsqueeze(1) * 2 - 1
     save_video(anchor_file, image_list)
 
     return sv3d_file, anchor_vis_file, anchor_file
@@ -299,9 +292,7 @@ def sample_all(
         len(azimuths_deg) == n_views_sv3d
     ), f"Please provide a list of {n_views_sv3d} values for azimuths_deg! Given {len(azimuths_deg)}"
     polars_rad = np.array([np.deg2rad(90 - e) for e in elevations_deg])
-    azimuths_rad = np.array(
-        [np.deg2rad((a - azimuths_deg[-1]) % 360) for a in azimuths_deg]
-    )
+    azimuths_rad = np.array([np.deg2rad((a - azimuths_deg[-1]) % 360) for a in azimuths_deg])
 
     # Initialize image matrix
     img_matrix = [[None] * n_views for _ in range(n_frames)]
@@ -336,20 +327,12 @@ def sample_all(
         polars = polars_rad[subsampled_views[1:]][None].repeat(T, 0).flatten()
         azims = azimuths_rad[subsampled_views[1:]][None].repeat(T, 0).flatten()
         azims = (azims - azimuths_rad[v0]) % (torch.pi * 2)
-        
+
         # alternate between forward and backward conditioning
         forward_inputs, forward_frame_indices, backward_inputs, backward_frame_indices = prepare_inputs(
-            frame_indices, 
-            img_matrix, 
-            v0, 
-            view_indices, 
-            model, 
-            version_dict, 
-            seed, 
-            polars, 
-            azims
+            frame_indices, img_matrix, v0, view_indices, model, version_dict, seed, polars, azims
         )
-        
+
         for step in range(num_steps):
             if step % 2 == 1:
                 c, uc, additional_model_inputs, sampler = forward_inputs
@@ -358,7 +341,7 @@ def sample_all(
                 c, uc, additional_model_inputs, sampler = backward_inputs
                 frame_indices = backward_frame_indices
             noisy_latents = latent_matrix[frame_indices][:, view_indices].flatten(0, 1)
-                
+
             samples = do_sample_per_step(
                 model,
                 sampler,
@@ -374,7 +357,6 @@ def sample_all(
                     latent_matrix[t, v] = samples[i, j]
 
         img_matrix = decode_latents(model, latent_matrix, img_matrix, frame_indices, view_indices, T)
-
 
     # concat video
     grid_list = []
@@ -493,4 +475,3 @@ with gr.Blocks() as demo:
 if __name__ == "__main__":
     demo.queue(max_size=20)
     demo.launch(share=True)
- 

@@ -145,15 +145,9 @@ if __name__ == "__main__":
     else:
         mode = "skip"
 
-    H = st.sidebar.number_input(
-        "H", value=version_dict["H"], min_value=64, max_value=2048
-    )
-    W = st.sidebar.number_input(
-        "W", value=version_dict["W"], min_value=64, max_value=2048
-    )
-    T = st.sidebar.number_input(
-        "T", value=version_dict["T"], min_value=0, max_value=128
-    )
+    H = st.sidebar.number_input("H", value=version_dict["H"], min_value=64, max_value=2048)
+    W = st.sidebar.number_input("W", value=version_dict["W"], min_value=64, max_value=2048)
+    T = st.sidebar.number_input("T", value=version_dict["T"], min_value=0, max_value=128)
     C = version_dict["C"]
     F = version_dict["f"]
     options = version_dict["options"]
@@ -164,9 +158,7 @@ if __name__ == "__main__":
             st.info(state["msg"])
         model = state["model"]
 
-        ukeys = set(
-            get_unique_embedder_keys_from_conditioner(state["model"].conditioner)
-        )
+        ukeys = set(get_unique_embedder_keys_from_conditioner(state["model"].conditioner))
 
         value_dict = init_embedder_options(
             ukeys,
@@ -183,9 +175,7 @@ if __name__ == "__main__":
             if "sv3d" in version:
                 cond_aug = 1e-5
             else:
-                cond_aug = st.number_input(
-                    "Conditioning augmentation:", value=0.02, min_value=0.0
-                )
+                cond_aug = st.number_input("Conditioning augmentation:", value=0.02, min_value=0.0)
             value_dict["cond_frames_without_noise"] = img
             value_dict["cond_frames"] = img + cond_aug * torch.randn_like(img)
             value_dict["cond_aug"] = cond_aug
@@ -209,14 +199,10 @@ if __name__ == "__main__":
             value_dict["polars_rad"] = np.array([np.deg2rad(90 - elev_deg)] * T)
             value_dict["azimuths_rad"] = np.linspace(0, 2 * np.pi, T + 1)[1:]
 
-        seed = st.sidebar.number_input(
-            "seed", value=23, min_value=0, max_value=int(1e9)
-        )
+        seed = st.sidebar.number_input("seed", value=23, min_value=0, max_value=int(1e9))
         seed_everything(seed)
 
-        save_locally, save_path = init_save_locally(
-            os.path.join(SAVE_PATH, version), init_value=True
-        )
+        save_locally, save_path = init_save_locally(os.path.join(SAVE_PATH, version), init_value=True)
 
         if "sv3d" in version:
             plot_save_path = os.path.join(save_path, "plot_3D.png")
@@ -244,9 +230,7 @@ if __name__ == "__main__":
         )
 
         if st.checkbox("Overwrite fps in mp4 generator", False):
-            saving_fps = st.number_input(
-                f"saving video at fps:", value=value_dict["fps"], min_value=1
-            )
+            saving_fps = st.number_input(f"saving video at fps:", value=value_dict["fps"], min_value=1)
         else:
             saving_fps = value_dict["fps"]
 
@@ -263,9 +247,7 @@ if __name__ == "__main__":
                 T=T,
                 batch2model_input=["num_video_frames", "image_only_indicator"],
                 force_uc_zero_embeddings=options.get("force_uc_zero_embeddings", None),
-                force_cond_zero_embeddings=options.get(
-                    "force_cond_zero_embeddings", None
-                ),
+                force_cond_zero_embeddings=options.get("force_cond_zero_embeddings", None),
                 return_latents=False,
                 decoding_t=decoding_t,
             )

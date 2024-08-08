@@ -86,38 +86,38 @@ def sample(
     if version == "svd":
         num_frames = default(num_frames, 14)
         num_steps = default(num_steps, 25)
-        output_folder = default(output_folder, "outputs/simple_video_sample/svd/")
+        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample/svd/")
         model_config = "scripts/sampling/configs/svd.yaml"
     elif version == "svd_xt":
         num_frames = default(num_frames, 25)
         num_steps = default(num_steps, 30)
-        output_folder = default(output_folder, "outputs/simple_video_sample/svd_xt/")
+        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample/svd_xt/")
         model_config = "scripts/sampling/configs/svd_xt.yaml"
     elif version == "svd_xt_1_1":
         num_frames = default(num_frames, 25)
         num_steps = default(num_steps, 30)
-        output_folder = default(output_folder, "outputs/simple_video_sample/svd_xt_1_1/")
+        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample/svd_xt_1_1/")
         model_config = "scripts/sampling/configs/svd_xt_1_1.yaml"
     elif version == "svd_image_decoder":
         num_frames = default(num_frames, 14)
         num_steps = default(num_steps, 25)
-        output_folder = default(output_folder, "outputs/simple_video_sample/svd_image_decoder/")
+        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample/svd_image_decoder/")
         model_config = "scripts/sampling/configs/svd_image_decoder.yaml"
     elif version == "svd_xt_image_decoder":
         num_frames = default(num_frames, 25)
         num_steps = default(num_steps, 30)
-        output_folder = default(output_folder, "outputs/simple_video_sample/svd_xt_image_decoder/")
+        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample/svd_xt_image_decoder/")
         model_config = "scripts/sampling/configs/svd_xt_image_decoder.yaml"
     elif version == "sv3d_u":
         num_frames = 21
         num_steps = default(num_steps, 50)
-        output_folder = default(output_folder, "outputs/simple_video_sample/sv3d_u/")
+        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample/sv3d_u/")
         model_config = "scripts/sampling/configs/sv3d_u.yaml"
         cond_aug = 1e-5
     elif version == "sv3d_p":
         num_frames = 21
         num_steps = default(num_steps, 50)
-        output_folder = default(output_folder, "outputs/simple_video_sample/sv3d_p/")
+        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample/sv3d_p/")
         model_config = "scripts/sampling/configs/sv3d_p.yaml"
         cond_aug = 1e-5
         if isinstance(elevations_deg, float) or isinstance(elevations_deg, int):
@@ -203,7 +203,6 @@ def sample(
                     print(
                         f"WARNING: Your image is of size {h}x{w} which is not divisible by 64. We are resizing to {height}x{width}!"
                     )
-
 
         image = TF.to_tensor(input_image)
 

@@ -9,6 +9,7 @@ import imageio
 import numpy as np
 import torch
 import torchvision.transforms as TT
+import copy
 from einops import rearrange, repeat
 from omegaconf import ListConfig, OmegaConf
 from PIL import Image, ImageSequence
@@ -16,7 +17,7 @@ from rembg import remove
 from torch import autocast
 from torchvision.transforms import ToTensor
 
-from scripts.util.detection.nsfw_and_watermark_dectection import DeepFloydDataFiltering
+from scripts.util.detection.nsfw_and_watermark_detection import DeepFloydDataFiltering
 from sgm.modules.autoencoding.temporal_ae import VideoDecoder
 from sgm.modules.diffusionmodules.guiders import (
     LinearPredictionGuider,
@@ -50,9 +51,7 @@ def initial_model_load(model):
     return model
 
 
-def get_resizing_factor(
-    desired_shape: Tuple[int, int], current_shape: Tuple[int, int]
-) -> float:
+def get_resizing_factor(desired_shape: Tuple[int, int], current_shape: Tuple[int, int]) -> float:
     r_bound = desired_shape[1] / desired_shape[0]
     aspect_r = current_shape[1] / current_shape[0]
     if r_bound >= 1.0:
@@ -108,10 +107,7 @@ def save_img(file_name, img):
 def save_video(file_name, imgs, fps=10):
     output_dir = os.path.dirname(file_name)
     os.makedirs(output_dir, exist_ok=True)
-    img_grid = [
-        (((img[0].permute(1, 2, 0) + 1) / 2).cpu().numpy() * 255.0).astype(np.uint8)
-        for img in imgs
-    ]
+    img_grid = [(((img[0].permute(1, 2, 0) + 1) / 2).cpu().numpy() * 255.0).astype(np.uint8) for img in imgs]
     if file_name.endswith(".gif"):
         imageio.mimwrite(file_name, img_grid, fps=fps, loop=0)
     else:
@@ -133,11 +129,7 @@ def read_video(
             raise ValueError("Path is not a valid video file.")
     elif path.is_dir():
         all_img_paths = sorted(
-            [
-                f
-                for f in path.iterdir()
-                if f.is_file() and f.suffix.lower() in [".jpg", ".jpeg", ".png"]
-            ]
+            [f for f in path.iterdir() if f.is_file() and f.suffix.lower() in [".jpg", ".jpeg", ".png"]]
         )[:n_frames]
     elif "*" in input_path:
         all_img_paths = sorted(glob(input_path))[:n_frames]
@@ -165,7 +157,9 @@ def read_video(
     return images_v0
 
 
-def preprocess_video(input_path, remove_bg=False, n_frames=21, W=576, H=576, output_folder=None, image_frame_ratio = 0.917):
+def preprocess_video(
+    input_path, remove_bg=False, n_frames=21, W=576, H=576, output_folder=None, image_frame_ratio=0.917
+):
     print(f"preprocess {input_path}")
     if output_folder is None:
         output_folder = os.path.dirname(input_path)
@@ -179,11 +173,7 @@ def preprocess_video(input_path, remove_bg=False, n_frames=21, W=576, H=576, out
             raise ValueError("Path is not a valid video file.")
     elif path.is_dir():
         all_img_paths = sorted(
-            [
-                f
-                for f in path.iterdir()
-                if f.is_file() and f.suffix.lower() in [".jpg", ".jpeg", ".png"]
-            ]
+            [f for f in path.iterdir() if f.is_file() and f.suffix.lower() in [".jpg", ".jpeg", ".png"]]
         )[:n_frames]
     elif "*" in input_path:
         all_img_paths = sorted(glob(input_path))[:n_frames]
@@ -220,15 +210,13 @@ def preprocess_video(input_path, remove_bg=False, n_frames=21, W=576, H=576, out
         in_w, in_h = image_arr.shape[:2]
         original_center = (in_w // 2, in_h // 2)
         if image.mode == "RGBA":
-            ret, mask = cv2.threshold(
-                np.array(image.split()[-1]), 0, 255, cv2.THRESH_BINARY
-            )
+            ret, mask = cv2.threshold(np.array(image.split()[-1]), 0, 255, cv2.THRESH_BINARY)
         else:
             # assume the input image has white background
             ret, mask = cv2.threshold(
                 (np.array(image).mean(-1) <= white_thresh).astype(np.uint8) * 255, 0, 255, cv2.THRESH_BINARY
             )
-            
+
         x, y, w, h = cv2.boundingRect(mask)
         box_coord[0] = min(box_coord[0], x)
         box_coord[1] = min(box_coord[1], y)
@@ -244,11 +232,7 @@ def preprocess_video(input_path, remove_bg=False, n_frames=21, W=576, H=576, out
         if image.mode == "RGB":
             image = image.convert("RGBA")
         image_arr = np.array(image)
-        side_len = (
-            int(box_size / image_frame_ratio)
-            if image_frame_ratio is not None
-            else in_w
-        )
+        side_len = int(box_size / image_frame_ratio) if image_frame_ratio is not None else in_w
         padded_image = np.zeros((side_len, side_len, 4), dtype=np.uint8)
         center = side_len // 2
         padded_image[
@@ -261,13 +245,14 @@ def preprocess_video(input_path, remove_bg=False, n_frames=21, W=576, H=576, out
         rgba_arr = np.array(rgba) / 255.0
         rgb = rgba_arr[..., :3] * rgba_arr[..., -1:] + (1 - rgba_arr[..., -1:])
         image = (rgb * 255).astype(np.uint8)
-        
+
         images_v0.append(image)
-    
+
     base_count = len(glob(os.path.join(output_folder, "*.mp4"))) // 12
     processed_file = os.path.join(output_folder, f"{base_count:06d}_process_input.mp4")
     imageio.mimwrite(processed_file, images_v0, fps=10)
     return processed_file
+
 
 def sample_sv3d(
     image,
@@ -351,15 +336,11 @@ def sample_sv3d(
             randn = torch.randn(shape, device=device)
 
             additional_model_inputs = {}
-            additional_model_inputs["image_only_indicator"] = torch.zeros(
-                2, num_frames
-            ).to(device)
+            additional_model_inputs["image_only_indicator"] = torch.zeros(2, num_frames).to(device)
             additional_model_inputs["num_video_frames"] = batch["num_video_frames"]
 
             def denoiser(input, sigma, c):
-                return model.denoiser(
-                    model.model, input, sigma, c, **additional_model_inputs
-                )
+                return model.denoiser(model.model, input, sigma, c, **additional_model_inputs)
 
             samples_z = model.sampler(denoiser, randn, cond=c, uc=uc)
             unload_module_gpu(model.model)
@@ -470,16 +451,10 @@ def get_guider_no_st(options, key):
         "SpatiotemporalPredictionGuider",
     ][options.get("guider", 2)]
 
-    additional_guider_kwargs = (
-        options["additional_guider_kwargs"]
-        if "additional_guider_kwargs" in options
-        else {}
-    )
+    additional_guider_kwargs = options["additional_guider_kwargs"] if "additional_guider_kwargs" in options else {}
 
     if guider == "IdentityGuider":
-        guider_config = {
-            "target": "sgm.modules.diffusionmodules.guiders.IdentityGuider"
-        }
+        guider_config = {"target": "sgm.modules.diffusionmodules.guiders.IdentityGuider"}
     elif guider == "VanillaCFG":
         scale_schedule = "Identity"
 
@@ -598,10 +573,7 @@ def get_sampler_no_st(sampler_name, steps, discretization_config, guider_config,
                 s_noise=s_noise,
                 verbose=False,
             )
-    elif (
-        sampler_name == "EulerAncestralSampler"
-        or sampler_name == "DPMPP2SAncestralSampler"
-    ):
+    elif sampler_name == "EulerAncestralSampler" or sampler_name == "DPMPP2SAncestralSampler":
         s_noise = 1.0
         eta = 1.0
 
@@ -666,15 +638,11 @@ def init_sampling_no_st(
         "EDMDiscretization",
     ][options.get("discretization", 1)]
 
-    discretization_config = get_discretization_no_st(
-        discretization, options=options, key=key
-    )
+    discretization_config = get_discretization_no_st(discretization, options=options, key=key)
 
     guider_config = get_guider_no_st(options=options, key=key)
 
-    sampler = get_sampler_no_st(
-        sampler, steps, discretization_config, guider_config, key=key
-    )
+    sampler = get_sampler_no_st(sampler, steps, discretization_config, guider_config, key=key)
     return sampler, num_rows, num_cols
 
 
@@ -719,9 +687,7 @@ def run_img2vid(
     cond_aug = 0.00
     if cond_motion is not None:
         value_dict["cond_frames_without_noise"] = cond_motion
-        value_dict["cond_frames"] = (
-            cond_motion[:, None].repeat(1, cond_view.shape[0], 1, 1, 1).flatten(0, 1)
-        )
+        value_dict["cond_frames"] = cond_motion[:, None].repeat(1, cond_view.shape[0], 1, 1, 1).flatten(0, 1)
         value_dict["cond_motion"] = cond_motion
         value_dict["cond_view"] = cond_view
     else:
@@ -769,37 +735,36 @@ def prepare_inputs(frame_indices, img_matrix, v0, view_indices, model, version_d
     cond_motion = torch.cat([img_matrix[t][v0] for t in forward_frame_indices], 0)
     cond_view = torch.cat([img_matrix[t0][v] for v in view_indices], 0)
     forward_inputs = prepare_sampling(
-                version_dict,
-                model,
-                image,
-                seed,
-                polars,
-                azims,
-                cond_motion,
-                cond_view,
-        )
-        
+        version_dict,
+        model,
+        image,
+        seed,
+        polars,
+        azims,
+        cond_motion,
+        cond_view,
+    )
+
     # backward sampling
-    backward_frame_indices = frame_indices[
-        ::-1
-    ].copy()
+    backward_frame_indices = frame_indices[::-1].copy()
     t0 = backward_frame_indices[0]
     image = img_matrix[t0][v0]
     cond_motion = torch.cat([img_matrix[t][v0] for t in backward_frame_indices], 0)
     cond_view = torch.cat([img_matrix[t0][v] for v in view_indices], 0)
     backward_inputs = prepare_sampling(
-            version_dict,
-            model,
-            image,
-            seed,
-            polars,
-            azims,
-            cond_motion,
-            cond_view,
-        )
+        version_dict,
+        model,
+        image,
+        seed,
+        polars,
+        azims,
+        cond_motion,
+        cond_view,
+    )
 
     unload_module_gpu(model.conditioner)
     return forward_inputs, forward_frame_indices, backward_inputs, backward_frame_indices
+
 
 def do_sample(
     model,
@@ -850,9 +815,7 @@ def do_sample(
 
                 for k in c:
                     if not k == "crossattn":
-                        c[k], uc[k] = map(
-                            lambda y: y[k][: math.prod(num_samples)].to("cuda"), (c, uc)
-                        )
+                        c[k], uc[k] = map(lambda y: y[k][: math.prod(num_samples)].to("cuda"), (c, uc))
 
                 additional_model_inputs = {}
                 for k in batch2model_input:
@@ -869,13 +832,9 @@ def do_sample(
                                 SpatiotemporalPredictionGuider,
                             ),
                         ):
-                            additional_model_inputs[k] = torch.zeros(
-                                num_samples[0] * 2, num_samples[1]
-                            ).to("cuda")
+                            additional_model_inputs[k] = torch.zeros(num_samples[0] * 2, num_samples[1]).to("cuda")
                         else:
-                            additional_model_inputs[k] = torch.zeros(num_samples).to(
-                                "cuda"
-                            )
+                            additional_model_inputs[k] = torch.zeros(num_samples).to("cuda")
                     else:
                         additional_model_inputs[k] = batch[k]
 
@@ -883,9 +842,8 @@ def do_sample(
                 randn = torch.randn(shape).to("cuda")
 
                 def denoiser(input, sigma, c):
-                    return model.denoiser(
-                        model.model, input, sigma, c, **additional_model_inputs
-                    )
+                    return model.denoiser(model.model, input, sigma, c, **additional_model_inputs)
+
                 load_module_gpu(model.model)
                 load_module_gpu(model.denoiser)
                 samples_z = sampler(denoiser, randn, cond=c, uc=uc)
@@ -893,9 +851,7 @@ def do_sample(
                 unload_module_gpu(model.denoiser)
                 load_module_gpu(model.first_stage_model)
                 if isinstance(model.first_stage_model.decoder, VideoDecoder):
-                    samples_x = model.decode_first_stage(
-                        samples_z, timesteps=default(decoding_t, T)
-                    )
+                    samples_x = model.decode_first_stage(samples_z, timesteps=default(decoding_t, T))
                 else:
                     samples_x = model.decode_first_stage(samples_z)
                 samples = torch.clamp((samples_x + 1.0) / 2.0, min=0.0, max=1.0)
@@ -946,9 +902,7 @@ def prepare_sampling_(
                 )
                 for k in c:
                     if not k == "crossattn":
-                        c[k], uc[k] = map(
-                            lambda y: y[k][: math.prod(num_samples)].to("cuda"), (c, uc)
-                        )
+                        c[k], uc[k] = map(lambda y: y[k][: math.prod(num_samples)].to("cuda"), (c, uc))
 
                 additional_model_inputs = {}
                 for k in batch2model_input:
@@ -965,13 +919,9 @@ def prepare_sampling_(
                                 SpatiotemporalPredictionGuider,
                             ),
                         ):
-                            additional_model_inputs[k] = torch.zeros(
-                                num_samples[0] * 2, num_samples[1]
-                            ).to("cuda")
+                            additional_model_inputs[k] = torch.zeros(num_samples[0] * 2, num_samples[1]).to("cuda")
                         else:
-                            additional_model_inputs[k] = torch.zeros(num_samples).to(
-                                "cuda"
-                            )
+                            additional_model_inputs[k] = torch.zeros(num_samples).to("cuda")
                     else:
                         additional_model_inputs[k] = batch[k]
     return c, uc, additional_model_inputs
@@ -982,10 +932,8 @@ def do_sample_per_step(model, sampler, noisy_latents, c, uc, step, additional_mo
     with torch.no_grad():
         with precision_scope("cuda"):
             with model.ema_scope():
-                noisy_latents_scaled, s_in, sigmas, num_sigmas, _, _ = (
-                    sampler.prepare_sampling_loop(
-                        noisy_latents.clone(), c, uc, sampler.num_steps
-                    )
+                noisy_latents_scaled, s_in, sigmas, num_sigmas, _, _ = sampler.prepare_sampling_loop(
+                    noisy_latents.clone(), c, uc, sampler.num_steps
                 )
 
                 if step == 0:
@@ -994,9 +942,7 @@ def do_sample_per_step(model, sampler, noisy_latents, c, uc, step, additional_mo
                     latents = noisy_latents
 
                 def denoiser(input, sigma, c):
-                    return model.denoiser(
-                        model.model, input, sigma, c, **additional_model_inputs
-                    )
+                    return model.denoiser(model.model, input, sigma, c, **additional_model_inputs)
 
                 gamma = (
                     min(sampler.s_churn / (num_sigmas - 1), 2**0.5 - 1)
@@ -1058,9 +1004,7 @@ def prepare_sampling(
     cond_aug = 0.00
     if cond_motion is not None:
         value_dict["cond_frames_without_noise"] = cond_motion
-        value_dict["cond_frames"] = (
-            cond_motion[:, None].repeat(1, cond_view.shape[0], 1, 1, 1).flatten(0, 1)
-        )
+        value_dict["cond_frames"] = cond_motion[:, None].repeat(1, cond_view.shape[0], 1, 1, 1).flatten(0, 1)
         value_dict["cond_motion"] = cond_motion
         value_dict["cond_view"] = cond_view
     else:
@@ -1103,17 +1047,9 @@ def get_batch_sv3d(keys, value_dict, N, T, device):
 
     for key in keys:
         if key == "fps_id":
-            batch[key] = (
-                torch.tensor([value_dict["fps_id"]])
-                .to(device)
-                .repeat(int(math.prod(N)))
-            )
+            batch[key] = torch.tensor([value_dict["fps_id"]]).to(device).repeat(int(math.prod(N)))
         elif key == "motion_bucket_id":
-            batch[key] = (
-                torch.tensor([value_dict["motion_bucket_id"]])
-                .to(device)
-                .repeat(int(math.prod(N)))
-            )
+            batch[key] = torch.tensor([value_dict["motion_bucket_id"]]).to(device).repeat(int(math.prod(N)))
         elif key == "cond_aug":
             batch[key] = repeat(
                 torch.tensor([value_dict["cond_aug"]]).to(device),
@@ -1154,28 +1090,18 @@ def get_batch(
 
         elif key == "original_size_as_tuple":
             batch["original_size_as_tuple"] = (
-                torch.tensor([value_dict["orig_height"], value_dict["orig_width"]])
-                .to(device)
-                .repeat(math.prod(N), 1)
+                torch.tensor([value_dict["orig_height"], value_dict["orig_width"]]).to(device).repeat(math.prod(N), 1)
             )
         elif key == "crop_coords_top_left":
             batch["crop_coords_top_left"] = (
-                torch.tensor(
-                    [value_dict["crop_coords_top"], value_dict["crop_coords_left"]]
-                )
+                torch.tensor([value_dict["crop_coords_top"], value_dict["crop_coords_left"]])
                 .to(device)
                 .repeat(math.prod(N), 1)
             )
         elif key == "aesthetic_score":
-            batch["aesthetic_score"] = (
-                torch.tensor([value_dict["aesthetic_score"]])
-                .to(device)
-                .repeat(math.prod(N), 1)
-            )
+            batch["aesthetic_score"] = torch.tensor([value_dict["aesthetic_score"]]).to(device).repeat(math.prod(N), 1)
             batch_uc["aesthetic_score"] = (
-                torch.tensor([value_dict["negative_aesthetic_score"]])
-                .to(device)
-                .repeat(math.prod(N), 1)
+                torch.tensor([value_dict["negative_aesthetic_score"]]).to(device).repeat(math.prod(N), 1)
             )
 
         elif key == "target_size_as_tuple":
@@ -1185,69 +1111,39 @@ def get_batch(
                 .repeat(math.prod(N), 1)
             )
         elif key == "fps":
-            batch[key] = (
-                torch.tensor([value_dict["fps"]]).to(device).repeat(math.prod(N))
-            )
+            batch[key] = torch.tensor([value_dict["fps"]]).to(device).repeat(math.prod(N))
         elif key == "fps_id":
-            batch[key] = (
-                torch.tensor([value_dict["fps_id"]]).to(device).repeat(math.prod(N))
-            )
+            batch[key] = torch.tensor([value_dict["fps_id"]]).to(device).repeat(math.prod(N))
         elif key == "motion_bucket_id":
-            batch[key] = (
-                torch.tensor([value_dict["motion_bucket_id"]])
-                .to(device)
-                .repeat(math.prod(N))
-            )
+            batch[key] = torch.tensor([value_dict["motion_bucket_id"]]).to(device).repeat(math.prod(N))
         elif key == "pool_image":
-            batch[key] = repeat(value_dict[key], "1 ... -> b ...", b=math.prod(N)).to(
-                device, dtype=torch.half
-            )
+            batch[key] = repeat(value_dict[key], "1 ... -> b ...", b=math.prod(N)).to(device, dtype=torch.half)
         elif key == "is_image":
-            batch[key] = (
-                torch.tensor([value_dict["is_image"]])
-                .to(device)
-                .repeat(math.prod(N))
-                .long()
-            )
+            batch[key] = torch.tensor([value_dict["is_image"]]).to(device).repeat(math.prod(N)).long()
         elif key == "is_webvid":
-            batch[key] = (
-                torch.tensor([value_dict["is_webvid"]])
-                .to(device)
-                .repeat(math.prod(N))
-                .long()
-            )
+            batch[key] = torch.tensor([value_dict["is_webvid"]]).to(device).repeat(math.prod(N)).long()
         elif key == "cond_aug":
             batch[key] = repeat(
                 torch.tensor([value_dict["cond_aug"]]).to("cuda"),
                 "1 -> b",
                 b=math.prod(N),
             )
-        elif (
-            key == "cond_frames"
-            or key == "cond_frames_without_noise"
-            or key == "back_frames"
-        ):
+        elif key == "cond_frames" or key == "cond_frames_without_noise" or key == "back_frames":
             # batch[key] = repeat(value_dict[key], "1 ... -> b ...", b=N[0])
             batch[key] = value_dict[key]
 
         elif key == "interpolation_context":
-            batch[key] = repeat(
-                value_dict["interpolation_context"], "b ... -> (b n) ...", n=N[1]
-            )
+            batch[key] = repeat(value_dict["interpolation_context"], "b ... -> (b n) ...", n=N[1])
 
         elif key == "start_frame":
             assert T is not None
             batch[key] = repeat(value_dict[key], "b ... -> (b t) ...", t=T)
 
         elif key == "polar_rad" or key == "azimuth_rad":
-            batch[key] = (
-                torch.tensor(value_dict[key]).to(device).repeat(math.prod(N) // T)
-            )
+            batch[key] = torch.tensor(value_dict[key]).to(device).repeat(math.prod(N) // T)
 
         elif key == "rotated":
-            batch[key] = (
-                torch.tensor([value_dict["rotated"]]).to(device).repeat(math.prod(N))
-            )
+            batch[key] = torch.tensor([value_dict["rotated"]]).to(device).repeat(math.prod(N))
 
         else:
             batch[key] = value_dict[key]
@@ -1278,9 +1174,7 @@ def load_model(
 
     config.model.params.sampler_config.params.verbose = verbose
     config.model.params.sampler_config.params.num_steps = num_steps
-    config.model.params.sampler_config.params.guider_config.params.num_frames = (
-        num_frames
-    )
+    config.model.params.sampler_config.params.guider_config.params.num_frames = num_frames
     if device == "cuda":
         with torch.device(device):
             model = instantiate_from_config(config.model).to(device).eval()

@@ -31,7 +31,7 @@ def sample(
     output_folder: Optional[str] = "outputs/sv4d",
     num_steps: Optional[int] = 20,
     sv3d_version: str = "sv3d_u",  # sv3d_u or sv3d_p
-    img_size: int = 576, # image resolution
+    img_size: int = 576,  # image resolution
     fps_id: int = 6,
     motion_bucket_id: int = 127,
     cond_aug: float = 1e-5,
@@ -83,9 +83,7 @@ def sample(
                 "cond_view",
                 "cond_motion",
             ],
-            "additional_guider_kwargs": {
-                "additional_cond_keys": ["cond_view", "cond_motion"]
-            },
+            "additional_guider_kwargs": {"additional_cond_keys": ["cond_view", "cond_motion"]},
         },
     }
 
@@ -117,9 +115,7 @@ def sample(
         len(azimuths_deg) == n_views_sv3d
     ), f"Please provide a list of {n_views_sv3d} values for azimuths_deg! Given {len(azimuths_deg)}"
     polars_rad = np.array([np.deg2rad(90 - e) for e in elevations_deg])
-    azimuths_rad = np.array(
-        [np.deg2rad((a - azimuths_deg[-1]) % 360) for a in azimuths_deg]
-    )
+    azimuths_rad = np.array([np.deg2rad((a - azimuths_deg[-1]) % 360) for a in azimuths_deg])
 
     # Sample multi-view images of the first frame using SV3D i.e. images at time 0
     images_t0 = sample_sv3d(
@@ -180,9 +176,7 @@ def sample(
     polars = polars_rad[subsampled_views[1:]][None].repeat(T, 0).flatten()
     azims = azimuths_rad[subsampled_views[1:]][None].repeat(T, 0).flatten()
     azims = (azims - azimuths_rad[v0]) % (torch.pi * 2)
-    samples = run_img2vid(
-        version_dict, model, image, seed, polars, azims, cond_motion, cond_view, decoding_t
-    )
+    samples = run_img2vid(version_dict, model, image, seed, polars, azims, cond_motion, cond_view, decoding_t)
     samples = samples.view(T, V, 3, H, W)
     for i, t in enumerate(frame_indices):
         for j, v in enumerate(view_indices):
@@ -199,20 +193,12 @@ def sample(
         polars = polars_rad[subsampled_views[1:]][None].repeat(T, 0).flatten()
         azims = azimuths_rad[subsampled_views[1:]][None].repeat(T, 0).flatten()
         azims = (azims - azimuths_rad[v0]) % (torch.pi * 2)
-        
+
         # alternate between forward and backward conditioning
         forward_inputs, forward_frame_indices, backward_inputs, backward_frame_indices = prepare_inputs(
-            frame_indices, 
-            img_matrix, 
-            v0, 
-            view_indices, 
-            model, 
-            version_dict, 
-            seed, 
-            polars, 
-            azims
+            frame_indices, img_matrix, v0, view_indices, model, version_dict, seed, polars, azims
         )
-        
+
         for step in tqdm(range(num_steps)):
             if step % 2 == 1:
                 c, uc, additional_model_inputs, sampler = forward_inputs
@@ -221,7 +207,7 @@ def sample(
                 c, uc, additional_model_inputs, sampler = backward_inputs
                 frame_indices = backward_frame_indices
             noisy_latents = latent_matrix[frame_indices][:, view_indices].flatten(0, 1)
-                
+
             samples = do_sample_per_step(
                 model,
                 sampler,
@@ -245,9 +231,7 @@ def sample(
         save_video(vid_file, [img_matrix[t][v] for t in range(n_frames)])
 
     # Save diagonal video
-    diag_frames = [
-        img_matrix[t][(t // (n_frames // n_views)) % n_views] for t in range(n_frames)
-    ]
+    diag_frames = [img_matrix[t][(t // (n_frames // n_views)) % n_views] for t in range(n_frames)]
     vid_file = os.path.join(output_folder, f"{base_count:06d}_diag.mp4")
     print(f"Saving {vid_file}")
     save_video(vid_file, diag_frames)

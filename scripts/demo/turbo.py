@@ -32,12 +32,8 @@ class SubstepSampler(EulerAncestralSampler):
         self.steps_subset = [0, 100, 200, 300, 1000]
 
     def prepare_sampling_loop(self, x, cond, uc=None, num_steps=None):
-        sigmas = self.discretization(
-            self.num_steps if num_steps is None else num_steps, device=self.device
-        )
-        sigmas = sigmas[
-            self.steps_subset[: self.n_sample_steps] + self.steps_subset[-1:]
-        ]
+        sigmas = self.discretization(self.num_steps if num_steps is None else num_steps, device=self.device)
+        sigmas = sigmas[self.steps_subset[: self.n_sample_steps] + self.steps_subset[-1:]]
         uc = cond
         x *= torch.sqrt(1.0 + sigmas[0] ** 2.0)
         num_sigmas = len(sigmas)
@@ -143,14 +139,7 @@ def sample(
             samples = torch.clamp((samples_x + 1.0) / 2.0, min=0.0, max=1.0)
             if filter is not None:
                 samples = filter(samples)
-            samples = (
-                (255 * samples)
-                .to(dtype=torch.uint8)
-                .permute(0, 2, 3, 1)
-                .detach()
-                .cpu()
-                .numpy()
-            )
+            samples = (255 * samples).to(dtype=torch.uint8).permute(0, 2, 3, 1).detach().cpu().numpy()
     return samples
 
 
@@ -199,17 +188,11 @@ if __name__ == "__main__":
         n_sample_steps=1,
         num_steps=1000,
         eta=1.0,
-        discretization_config=dict(
-            target="sgm.modules.diffusionmodules.discretizer.LegacyDDPMDiscretization"
-        ),
+        discretization_config=dict(target="sgm.modules.diffusionmodules.discretizer.LegacyDDPMDiscretization"),
     )
     sampler.n_sample_steps = n_steps
-    default_prompt = (
-        "A cinematic shot of a baby racoon wearing an intricate italian priest robe."
-    )
-    prompt = st_keyup(
-        "Enter a value", value=default_prompt, debounce=300, key="interactive_text"
-    )
+    default_prompt = "A cinematic shot of a baby racoon wearing an intricate italian priest robe."
+    prompt = st_keyup("Enter a value", value=default_prompt, debounce=300, key="interactive_text")
 
     cols = st.columns([1, 5, 1])
     if mode != "skip":

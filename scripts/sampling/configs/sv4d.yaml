@@ -8,7 +8,7 @@ model:
     scale_factor: 0.18215
     en_and_decode_n_samples_a_time: 7
     disable_first_stage_autocast: True
-    ckpt_path: checkpoints/sv4d.safetensors
+    ckpt_path: /fast/sgm_checkpoints/sv4d.safetensors
 
     denoiser_config:
       target: sgm.modules.diffusionmodules.denoiser.Denoiser

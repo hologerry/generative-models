@@ -1,5 +1,7 @@
-import torch
 from typing import Optional, Union
+
+import torch
+
 from ...util import default, instantiate_from_config
 
 
@@ -16,9 +18,7 @@ class EDMSampling:
 class DiscreteSampling:
     def __init__(self, discretization_config, num_idx, do_append_zero=False, flip=True):
         self.num_idx = num_idx
-        self.sigmas = instantiate_from_config(discretization_config)(
-            num_idx, do_append_zero=do_append_zero, flip=flip
-        )
+        self.sigmas = instantiate_from_config(discretization_config)(num_idx, do_append_zero=do_append_zero, flip=flip)
 
     def idx_to_sigma(self, idx):
         return self.sigmas[idx]
@@ -32,7 +32,5 @@ class DiscreteSampling:
 
 
 class ZeroSampler:
-    def __call__(
-        self, n_samples: int, rand: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    def __call__(self, n_samples: int, rand: Optional[torch.Tensor] = None) -> torch.Tensor:
         return torch.zeros_like(default(rand, torch.randn((n_samples,)))) + 1.0e-5

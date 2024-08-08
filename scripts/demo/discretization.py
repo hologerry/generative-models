@@ -34,9 +34,7 @@ class Txt2NoisyDiscretizationWrapper:
         strength: float between 0.0 and 1.0. 0.0 means full sampling (all sigmas are returned)
     """
 
-    def __init__(
-        self, discretization: Discretization, strength: float = 0.0, original_steps=None
-    ):
+    def __init__(self, discretization: Discretization, strength: float = 0.0, original_steps=None):
         self.discretization = discretization
         self.strength = strength
         self.original_steps = original_steps

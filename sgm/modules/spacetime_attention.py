@@ -57,9 +57,7 @@ class BasicTransformerTimeMixBlock(nn.Module):
 
         if self.ff_in:
             self.norm_in = nn.LayerNorm(dim)
-            self.ff_in = FeedForward(
-                dim, dim_out=inner_dim, dropout=dropout, glu=gated_ff
-            )
+            self.ff_in = FeedForward(dim, dim_out=inner_dim, dropout=dropout, glu=gated_ff)
 
         self.timesteps = timesteps
         self.disable_self_attn = disable_self_attn
@@ -106,9 +104,7 @@ class BasicTransformerTimeMixBlock(nn.Module):
         if self.checkpoint:
             logpy.info(f"{self.__class__.__name__} is using checkpointing")
 
-    def forward(
-        self, x: torch.Tensor, context: torch.Tensor = None, timesteps: int = None
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, context: torch.Tensor = None, timesteps: int = None) -> torch.Tensor:
         if self.checkpoint:
             return checkpoint(self._forward, x, context, timesteps)
         else:
@@ -142,9 +138,7 @@ class BasicTransformerTimeMixBlock(nn.Module):
         if self.is_res:
             x += x_skip
 
-        x = rearrange(
-            x, "(b s) t c -> (b t) s c", s=S, b=B // timesteps, c=C, t=timesteps
-        )
+        x = rearrange(x, "(b s) t c -> (b t) s c", s=S, b=B // timesteps, c=C, t=timesteps)
         return x
 
     def get_last_layer(self):
@@ -238,9 +232,7 @@ class PostHocSpatialTransformerWithTimeMixing(SpatialTransformer):
             if merge_strategy == "fixed":
                 self.register_buffer("mix_factor", torch.Tensor([merge_factor]))
             elif merge_strategy == "learned" or merge_strategy == "learned_with_images":
-                self.register_parameter(
-                    "mix_factor", torch.nn.Parameter(torch.Tensor([merge_factor]))
-                )
+                self.register_parameter("mix_factor", torch.nn.Parameter(torch.Tensor([merge_factor])))
             elif merge_strategy == "fixed_with_images":
                 self.mix_factor = None
             else:
@@ -254,9 +246,7 @@ class PostHocSpatialTransformerWithTimeMixing(SpatialTransformer):
                 is_attn=True,
             )
         else:
-            self.time_mixer = AlphaBlender(
-                alpha=merge_factor, merge_strategy=merge_strategy
-            )
+            self.time_mixer = AlphaBlender(alpha=merge_factor, merge_strategy=merge_strategy)
 
     def forward(
         self,
@@ -278,15 +268,11 @@ class PostHocSpatialTransformerWithTimeMixing(SpatialTransformer):
             spatial_context = context
 
         if self.use_spatial_context:
-            assert (
-                context.ndim == 3
-            ), f"n dims of spatial context should be 3 but are {context.ndim}"
+            assert context.ndim == 3, f"n dims of spatial context should be 3 but are {context.ndim}"
 
             time_context = context
             time_context_first_timestep = time_context[::timesteps]
-            time_context = repeat(
-                time_context_first_timestep, "b ... -> (b n) ...", n=h * w
-            )
+            time_context = repeat(time_context_first_timestep, "b ... -> (b n) ...", n=h * w)
         elif time_context is not None and not self.use_spatial_context:
             time_context = repeat(time_context, "b ... -> (b n) ...", n=h * w)
             if time_context.ndim == 2:
@@ -314,16 +300,9 @@ class PostHocSpatialTransformerWithTimeMixing(SpatialTransformer):
         emb = self.time_mix_time_embed(t_emb)
         emb = emb[:, None, :]
 
-        for it_, (block, mix_block) in enumerate(
-            zip(self.transformer_blocks, self.time_mix_blocks)
-        ):
+        for it_, (block, mix_block) in enumerate(zip(self.transformer_blocks, self.time_mix_blocks)):
             # spatial attention
-            x = block(
-                x,
-                context=spatial_context,
-                time_step=time_step, 
-                name=name + '_' + str(it_)
-            )
+            x = block(x, context=spatial_context, time_step=time_step, name=name + "_" + str(it_))
 
             x_mix = x
             x_mix = x_mix + emb
@@ -346,7 +325,7 @@ class PostHocSpatialTransformerWithTimeMixing(SpatialTransformer):
             x = self.proj_out(x)
         out = x + x_in
         return out
-    
+
 
 class PostHocSpatialTransformerWithTimeMixingAndMotion(SpatialTransformer):
     def __init__(
@@ -399,7 +378,7 @@ class PostHocSpatialTransformerWithTimeMixingAndMotion(SpatialTransformer):
             time_context_dim = context_dim
 
         camera_context_dim = time_context_dim
-        motion_context_dim = 4 # time_context_dim
+        motion_context_dim = 4  # time_context_dim
 
         # Camera attention layer
         self.time_mix_blocks = nn.ModuleList(
@@ -467,9 +446,7 @@ class PostHocSpatialTransformerWithTimeMixingAndMotion(SpatialTransformer):
             if merge_strategy == "fixed":
                 self.register_buffer("mix_factor", torch.Tensor([merge_factor]))
             elif merge_strategy == "learned" or merge_strategy == "learned_with_images":
-                self.register_parameter(
-                    "mix_factor", torch.nn.Parameter(torch.Tensor([merge_factor]))
-                )
+                self.register_parameter("mix_factor", torch.nn.Parameter(torch.Tensor([merge_factor])))
             elif merge_strategy == "fixed_with_images":
                 self.mix_factor = None
             else:
@@ -483,9 +460,7 @@ class PostHocSpatialTransformerWithTimeMixingAndMotion(SpatialTransformer):
                 is_attn=True,
             )
         else:
-            self.time_mixer = AlphaBlender(
-                alpha=merge_factor, merge_strategy=merge_strategy
-            )
+            self.time_mixer = AlphaBlender(alpha=merge_factor, merge_strategy=merge_strategy)
 
     def forward(
         self,
@@ -508,17 +483,17 @@ class PostHocSpatialTransformerWithTimeMixingAndMotion(SpatialTransformer):
 
         # cond_view: b v 4 h w
         # cond_motion: b t 4 h w
-        b, t, d1 = context.shape # CLIP
-        v, d2 = cond_view.shape[0]//b, cond_view.shape[1] # VAE
-        cond_view = torch.nn.functional.interpolate(cond_view, size=(h,w), mode="bilinear") # b*v d h w
-        spatial_context = context[:,:,None].repeat(1,1,v,1).reshape(-1,1,d1) # (b*t*v) 1 d1
-        camera_context = context[:,:,None].repeat(1,1,h*w,1).reshape(-1,1,d1) # (b*t*h*w) 1 d1
-        motion_context = cond_view.permute(0,2,3,1).reshape(-1,1,d2) # (b*v*h*w) 1 d2
+        b, t, d1 = context.shape  # CLIP
+        v, d2 = cond_view.shape[0] // b, cond_view.shape[1]  # VAE
+        cond_view = torch.nn.functional.interpolate(cond_view, size=(h, w), mode="bilinear")  # b*v d h w
+        spatial_context = context[:, :, None].repeat(1, 1, v, 1).reshape(-1, 1, d1)  # (b*t*v) 1 d1
+        camera_context = context[:, :, None].repeat(1, 1, h * w, 1).reshape(-1, 1, d1)  # (b*t*h*w) 1 d1
+        motion_context = cond_view.permute(0, 2, 3, 1).reshape(-1, 1, d2)  # (b*v*h*w) 1 d2
 
         x = self.norm(x)
         if not self.use_linear:
             x = self.proj_in(x)
-        x = rearrange(x, "b c h w -> b (h w) c") # 21 x 4096 x 320
+        x = rearrange(x, "b c h w -> b (h w) c")  # 21 x 4096 x 320
         if self.use_linear:
             x = self.proj_in(x)
         c = x.shape[-1]
@@ -536,7 +511,7 @@ class PostHocSpatialTransformerWithTimeMixingAndMotion(SpatialTransformer):
             max_period=self.max_time_embed_period,
         )
         emb_time = self.time_mix_motion_embed(t_emb)
-        emb_time = emb_time[:, None, :] # b*t x 1 x 320
+        emb_time = emb_time[:, None, :]  # b*t x 1 x 320
 
         num_views = torch.arange(v, device=x.device)
         num_views = repeat(num_views, "t -> b t", b=b)
@@ -548,7 +523,7 @@ class PostHocSpatialTransformerWithTimeMixingAndMotion(SpatialTransformer):
             max_period=self.max_time_embed_period,
         )
         emb_view = self.time_mix_time_embed(v_emb)
-        emb_view = emb_view[:, None, :] # b*v x 1 x 320
+        emb_view = emb_view[:, None, :]  # b*v x 1 x 320
 
         for it_, (block, time_block, mot_block) in enumerate(
             zip(self.transformer_blocks, self.time_mix_blocks, self.motion_blocks)
@@ -560,7 +535,7 @@ class PostHocSpatialTransformerWithTimeMixingAndMotion(SpatialTransformer):
             )
 
             # Camera attention
-            x = x.view(b, t, v, h*w, c).permute(0,2,1,3,4).reshape(b*v,-1,c) # b*v t*h*w c
+            x = x.view(b, t, v, h * w, c).permute(0, 2, 1, 3, 4).reshape(b * v, -1, c)  # b*v t*h*w c
             x_mix = x + emb_view
             x_mix = time_block(x_mix, context=camera_context, timesteps=v)
             if self.time_mix_legacy:
@@ -569,11 +544,11 @@ class PostHocSpatialTransformerWithTimeMixingAndMotion(SpatialTransformer):
                 x = self.time_mixer(
                     x_spatial=x,
                     x_temporal=x_mix,
-                    image_only_indicator=image_only_indicator[:,:v],
+                    image_only_indicator=image_only_indicator[:, :v],
                 )
 
             # Motion attention
-            x = x.view(b, v, t, h*w, c).permute(0,2,1,3,4).reshape(b*t,-1,c) # b*t v*h*w c
+            x = x.view(b, v, t, h * w, c).permute(0, 2, 1, 3, 4).reshape(b * t, -1, c)  # b*t v*h*w c
             x_mix = x + emb_time
             x_mix = mot_block(x_mix, context=motion_context, timesteps=t)
             if self.time_mix_legacy:
@@ -582,10 +557,10 @@ class PostHocSpatialTransformerWithTimeMixingAndMotion(SpatialTransformer):
                 x = self.time_mixer(
                     x_spatial=x,
                     x_temporal=x_mix,
-                    image_only_indicator=image_only_indicator[:,:t],
+                    image_only_indicator=image_only_indicator[:, :t],
                 )
 
-            x = x.view(b, t, v, h*w, c).reshape(-1,h*w,c) # b*t*v h*w c
+            x = x.view(b, t, v, h * w, c).reshape(-1, h * w, c)  # b*t*v h*w c
 
         if self.use_linear:
             x = self.proj_out(x)
