@@ -13,9 +13,9 @@ import torch.nn as nn
 from einops import rearrange
 from packaging import version
 
-from ..modules.autoencoding.regularizers import AbstractRegularizer
-from ..modules.ema import LitEma
-from ..util import (
+from sgm.modules.autoencoding.regularizers import AbstractRegularizer
+from sgm.modules.ema import LitEma
+from sgm.util import (
     default,
     get_nested_attribute,
     get_obj_from_str,

@@ -2,31 +2,32 @@
 import os
 import sys
 
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "generative-models"))
 
 from glob import glob
-from typing import Optional
+from typing import List, Optional, Union
 
 import gradio as gr
 import numpy as np
 import torch
-from huggingface_hub import hf_hub_download
-from typing import List, Optional, Union
 import torchvision
 
-from sgm.modules.encoders.modules import VideoPredictionEmbedderWithEncoder
+from huggingface_hub import hf_hub_download
+
 from scripts.demo.sv4d_helpers import (
     decode_latents,
-    load_model,
+    do_sample_per_step,
     initial_model_load,
+    load_model,
+    prepare_inputs,
+    preprocess_video,
     read_video,
     run_img2vid,
-    prepare_inputs,
-    do_sample_per_step,
     sample_sv3d,
     save_video,
-    preprocess_video,
 )
+from sgm.modules.encoders.modules import VideoPredictionEmbedderWithEncoder
 
 
 # the tmp path, if /tmp/gradio is not writable, change it to a writable path

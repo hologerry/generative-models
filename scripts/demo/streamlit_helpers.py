@@ -690,7 +690,7 @@ def do_img2img(
     force_uc_zero_embeddings: Optional[List] = None,
     force_cond_zero_embeddings: Optional[List] = None,
     additional_kwargs={},
-    offset_noise_level: int = 0.0,
+    offset_noise_level: float = 0.0,
     return_latents=False,
     skip_encode=False,
     filter=None,

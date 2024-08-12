@@ -13,7 +13,7 @@ from ...modules.spacetime_attention import (
 )
 from ...modules.video_attention import SpatialVideoTransformer
 from ...util import default
-from .util import AlphaBlender, get_alpha  # , LegacyAlphaBlenderWithBug, get_alpha
+from .util import AlphaBlender, get_alpha
 
 
 class VideoResBlock(ResBlock):

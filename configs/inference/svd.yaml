@@ -100,7 +100,7 @@ model:
           target: torch.nn.Identity
         regularizer_config:
           target: sgm.modules.autoencoding.regularizers.DiagonalGaussianRegularizer
-        encoder_config: 
+        encoder_config:
           target: sgm.modules.diffusionmodules.model.Encoder
           params:
             attn_type: vanilla

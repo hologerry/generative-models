@@ -146,10 +146,12 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
 class Upsample(nn.Module):
     """
     An upsampling layer with an optional convolution.
-    :param channels: channels in the inputs and outputs.
-    :param use_conv: a bool determining if a convolution is applied.
-    :param dims: determines if the signal is 1D, 2D, or 3D. If 3D, then
-                 upsampling occurs in the inner-two dimensions.
+
+    Args:
+        channels (int): Number of channels in the input and output tensors.
+        use_conv (bool): If True, applies a convolution after upsampling.
+        dims (int): Dimensionality of the signal (1D, 2D, or 3D).
+            If 3D, upsampling is applied to the two spatial dimensions.
     """
 
     def __init__(
@@ -501,33 +503,30 @@ class Timestep(nn.Module):
 
 
 class UNetModel(nn.Module):
-    """
-    The full UNet model with attention and timestep embedding.
-    :param in_channels: channels in the input Tensor.
-    :param model_channels: base channel count for the model.
-    :param out_channels: channels in the output Tensor.
-    :param num_res_blocks: number of residual blocks per downsample.
-    :param attention_resolutions: a collection of downsample rates at which
-        attention will take place. May be a set, list, or tuple.
-        For example, if this contains 4, then at 4x downsampling, attention
-        will be used.
-    :param dropout: the dropout probability.
-    :param channel_mult: channel multiplier for each level of the UNet.
-    :param conv_resample: if True, use learned convolutions for upsampling and
-        downsampling.
-    :param dims: determines if the signal is 1D, 2D, or 3D.
-    :param num_classes: if specified (as an int), then this model will be
-        class-conditional with `num_classes` classes.
-    :param use_checkpoint: use gradient checkpointing to reduce memory usage.
-    :param num_heads: the number of attention heads in each attention layer.
-    :param num_heads_channels: if specified, ignore num_heads and instead use
-                               a fixed channel width per attention head.
-    :param num_heads_upsample: works with num_heads to set a different number
-                               of heads for upsampling. Deprecated.
-    :param use_scale_shift_norm: use a FiLM-like conditioning mechanism.
-    :param resblock_updown: use residual blocks for up/downsampling.
-    :param use_new_attention_order: use a different attention pattern for potentially
-                                    increased efficiency.
+    """A UNet model with attention mechanisms and timestep embedding.
+
+    Args:
+        in_channels (int): Number of channels in the input tensor.
+        model_channels (int): Base channel count for the model.
+        out_channels (int): Number of channels in the output tensor.
+        num_res_blocks (int): Number of residual blocks per downsampling stage.
+        attention_resolutions (Union[Set[int], List[int], Tuple[int]]): A collection of downsampling factors
+            at which attention is applied. For instance, if 4 is included, attention will be used at 4x
+            downsampling.
+        dropout (float): Dropout probability.
+        channel_mult (List[int]): Multiplier for the number of channels at each level of the UNet.
+        conv_resample (bool): If True, use learned convolutions for upsampling and downsampling.
+        dims (int): Dimensionality of the signal (1D, 2D, or 3D).
+        num_classes (Optional[int]): If provided, makes the model class-conditional with the specified
+            number of classes.
+        use_checkpoint (bool): Use gradient checkpointing to save memory.
+        num_heads (int): Number of attention heads in each attention layer.
+        num_heads_channels (Optional[int]): If provided, overrides num_heads and sets a fixed channel
+            width per attention head.
+        num_heads_upsample (int): Number of attention heads used for upsampling. Deprecated.
+        use_scale_shift_norm (bool): Use FiLM-like conditioning for normalization.
+        resblock_updown (bool): Use residual blocks for upsampling and downsampling.
+        use_new_attention_order (bool): Use an alternative attention order for improved efficiency.
     """
 
     def __init__(

@@ -3,6 +3,7 @@ from streamlit_helpers import *
 
 from sgm.modules.diffusionmodules.sampling import EulerAncestralSampler
 
+
 VERSION2SPECS = {
     "SDXL-Turbo": {
         "H": 512,

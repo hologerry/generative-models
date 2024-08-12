@@ -2,6 +2,7 @@ from pytorch_lightning import seed_everything
 
 from scripts.demo.streamlit_helpers import *
 
+
 SAVE_PATH = "outputs/demo/txt2img/"
 
 SD_XL_BASE_RATIOS = {

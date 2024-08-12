@@ -17,7 +17,10 @@ from ...modules.diffusionmodules.sampling_utils import (
     to_sigma,
 )
 from ...util import append_dims, default, instantiate_from_config
+from .discretizer import Discretization
 
+
+from .guiders import IdentityGuider
 
 DEFAULT_GUIDER = {"target": "sgm.modules.diffusionmodules.guiders.IdentityGuider"}
 
@@ -28,12 +31,12 @@ class BaseDiffusionSampler:
         discretization_config: Union[Dict, ListConfig, OmegaConf],
         num_steps: Union[int, None] = None,
         guider_config: Union[Dict, ListConfig, OmegaConf, None] = None,
-        verbose: bool = False,
+        verbose: bool = True,
         device: str = "cuda",
     ):
         self.num_steps = num_steps
-        self.discretization = instantiate_from_config(discretization_config)
-        self.guider = instantiate_from_config(
+        self.discretization: Discretization = instantiate_from_config(discretization_config)
+        self.guider: IdentityGuider = instantiate_from_config(
             default(
                 guider_config,
                 DEFAULT_GUIDER,

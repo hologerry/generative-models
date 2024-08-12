@@ -412,7 +412,7 @@ class ImageLogger(Callback):
                 "dtype": torch.get_autocast_gpu_dtype(),
                 "cache_enabled": torch.is_autocast_cache_enabled(),
             }
-            with torch.no_grad(), torch.cuda.amp.autocast(**gpu_autocast_kwargs):
+            with torch.no_grad(), torch.amp.autocast('cuda', **gpu_autocast_kwargs):
                 images = pl_module.log_images(
                     batch, split=split, **self.log_images_kwargs
                 )

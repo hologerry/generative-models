@@ -13,7 +13,6 @@ from fire import Fire
 from sgm.modules.encoders.modules import VideoPredictionEmbedderWithEncoder
 from scripts.demo.sv4d_helpers import (
     decode_latents,
-    load_model,
     initial_model_load,
     read_video,
     run_img2vid,
@@ -23,6 +22,9 @@ from scripts.demo.sv4d_helpers import (
     sample_sv3d,
     save_video,
     preprocess_video,
+)
+from scripts.demo.svd_helpers import (
+    load_model,
 )
 
 

@@ -93,8 +93,8 @@ class VideoTransformerBlock(nn.Module):
         self.switch_temporal_ca_to_sa = switch_temporal_ca_to_sa
 
         self.checkpoint = checkpoint
-        if self.checkpoint:
-            print(f"{self.__class__.__name__} is using checkpointing")
+        # if self.checkpoint:
+        #     print(f"{self.__class__.__name__} is using checkpointing")
 
     def forward(self, x: torch.Tensor, context: torch.Tensor = None, timesteps: int = None) -> torch.Tensor:
         if self.checkpoint:

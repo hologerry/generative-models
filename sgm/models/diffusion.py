@@ -10,11 +10,16 @@ from omegaconf import ListConfig, OmegaConf
 from safetensors.torch import load_file as load_safetensors
 from torch.optim.lr_scheduler import LambdaLR
 
-from ..modules import UNCONDITIONAL_CONFIG
-from ..modules.autoencoding.temporal_ae import VideoDecoder
-from ..modules.diffusionmodules.wrappers import OPENAIUNETWRAPPER
-from ..modules.ema import LitEma
-from ..util import (
+from sgm.models import AutoencodingEngine
+from sgm.modules import UNCONDITIONAL_CONFIG, GeneralConditioner
+from sgm.modules.autoencoding.temporal_ae import VideoDecoder
+from sgm.modules.diffusionmodules.denoiser import Denoiser
+from sgm.modules.diffusionmodules.openaimodel import UNetModel
+from sgm.modules.diffusionmodules.sampling import BaseDiffusionSampler
+from sgm.modules.diffusionmodules.video_model import VideoUNet
+from sgm.modules.diffusionmodules.wrappers import OPENAIUNETWRAPPER
+from sgm.modules.ema import LitEma
+from sgm.util import (
     default,
     disabled_train,
     get_obj_from_str,
@@ -51,11 +56,17 @@ class DiffusionEngine(pl.LightningModule):
         self.input_key = input_key
         self.optimizer_config = default(optimizer_config, {"target": "torch.optim.AdamW"})
         model = instantiate_from_config(network_config)
-        self.model = get_obj_from_str(default(network_wrapper, OPENAIUNETWRAPPER))(model, compile_model=compile_model)
+        self.model: VideoUNet | UNetModel = get_obj_from_str(default(network_wrapper, OPENAIUNETWRAPPER))(
+            model, compile_model=compile_model
+        )
 
-        self.denoiser = instantiate_from_config(denoiser_config)
-        self.sampler = instantiate_from_config(sampler_config) if sampler_config is not None else None
-        self.conditioner = instantiate_from_config(default(conditioner_config, UNCONDITIONAL_CONFIG))
+        self.denoiser: Denoiser = instantiate_from_config(denoiser_config)
+        self.sampler: BaseDiffusionSampler = (
+            instantiate_from_config(sampler_config) if sampler_config is not None else None
+        )
+        self.conditioner: GeneralConditioner = instantiate_from_config(
+            default(conditioner_config, UNCONDITIONAL_CONFIG)
+        )
         self.scheduler_config = scheduler_config
         self._init_first_stage(first_stage_config)
 
@@ -94,7 +105,7 @@ class DiffusionEngine(pl.LightningModule):
             print(f"Unexpected Keys: {unexpected}")
 
     def _init_first_stage(self, config):
-        model = instantiate_from_config(config).eval()
+        model: AutoencodingEngine = instantiate_from_config(config).eval()
         model.train = disabled_train
         for param in model.parameters():
             param.requires_grad = False

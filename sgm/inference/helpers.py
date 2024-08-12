@@ -1,9 +1,11 @@
 import math
 import os
+
 from typing import List, Optional, Union
 
 import numpy as np
 import torch
+
 from einops import rearrange
 from imwatermark import WatermarkEncoder
 from omegaconf import ListConfig
