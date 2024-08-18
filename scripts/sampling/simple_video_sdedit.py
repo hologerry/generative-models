@@ -23,11 +23,12 @@ from scripts.demo.svd_helpers import (
     load_model,
 )
 from sgm.util import append_dims, default
+from scripts.demo.discretization import Img2ImgDiscretizationWrapper
 
-
-def load_frames(frame_dir, start_frame_idx=90, num_frames=90, view_idx=0):
+def load_frames(frame_dir, start_frame_idx=90, num_frames=90, view_idx=0, fps=30):
     frames = []
-    for i in range(start_frame_idx, start_frame_idx + num_frames):
+    frame_step = 30 // fps
+    for i in range(start_frame_idx, start_frame_idx + num_frames * frame_step, frame_step):
         frame_path = os.path.join(frame_dir, f"render_frame{i:03d}_train{view_idx:02d}_last.png")
         assert os.path.exists(frame_path), f"Frame {frame_path} does not exist."
         frame = cv2.imread(frame_path)
@@ -49,6 +50,7 @@ def sample(
     motion_bucket_id: int = 127,
     cond_aug: float = 0.02,
     input_aug: float = 0.0,
+    img2img_strength: Optional[float] = None,
     offset_noise_level: float = 0.0,
     sigma_idx: int = 0,
     seed: int = 23,
@@ -59,6 +61,7 @@ def sample(
     experiment_name: str = "experiment_name",
     output_folder: Optional[str] = None,
     verbose: Optional[bool] = True,
+    extra_str: Optional[str] = None,
 ):
     """
     Simple script to generate a single sample conditioned on an image `input_path` or multiple images, one for each
@@ -68,17 +71,17 @@ def sample(
     if version == "svd":
         num_frames = default(num_frames, 14)
         num_steps = default(num_steps, 25)
-        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sdedit_svd/")
+        output_folder = default(output_folder, "simple_video_sdedit_svd/")
         model_config = "scripts/sampling/configs/svd.yaml"
     elif version == "svd_xt":
         num_frames = default(num_frames, 25)
         num_steps = default(num_steps, 30)
-        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sdedit_svd_xt/")
+        output_folder = default(output_folder, "simple_video_sdedit_svd_xt/")
         model_config = "scripts/sampling/configs/svd_xt.yaml"
     elif version == "svd_xt_1_1":
         num_frames = default(num_frames, 25)
         num_steps = default(num_steps, 30)
-        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sdedit_svd_xt_1_1/")
+        output_folder = default(output_folder, "simple_video_sdedit_svd_xt_1_1/")
         model_config = "scripts/sampling/configs/svd_xt_1_1.yaml"
 
     else:
@@ -92,13 +95,20 @@ def sample(
         num_steps,
         verbose,
     )
+
+    if img2img_strength is not None:
+        print(f"Wrapping {model.sampler.__class__.__name__} with Img2ImgDiscretizationWrapper")
+        model.sampler.discretization = Img2ImgDiscretizationWrapper(model.sampler.discretization, strength=img2img_strength)
+
     torch.manual_seed(seed)
     print("Model loaded.")
 
     print("Loading frames...")
     assert os.path.isdir(input_path), f"Input path {input_path} is not a directory."
     assert os.path.exists(input_path), f"Input path {input_path} does not exist."
-    frames = load_frames(input_path, start_frame_idx=start_idx, num_frames=num_frames, view_idx=view_idx)
+    frames = load_frames(
+        input_path, start_frame_idx=start_idx, num_frames=num_frames, view_idx=view_idx, fps=fps_id + 1
+    )
     image = frames[0]
     input_image = TF.to_pil_image((image + 1.0) / 2.0)
 
@@ -106,9 +116,9 @@ def sample(
     image = image.unsqueeze(0).to(device)
     H, W = image.shape[2:]
     assert image.shape[1] == 3
-    F = 8
-    C = 4
-    shape = (num_frames, C, H // F, W // F)
+    # F = 8
+    # C = 4
+    # shape = (num_frames, C, H // F, W // F)
     if (H, W) != (576, 1024):
         print(
             "WARNING: The conditioning frame you provided is not 576x1024. This leads to suboptimal performance as model was only trained on 576x1024. Consider increasing `cond_aug`."
@@ -162,6 +172,7 @@ def sample(
 
     frames_z = model.encode_first_stage(frames_aug)
     noise = torch.randn_like(frames_z)
+
     sigmas = model.sampler.discretization(model.sampler.num_steps)
 
     sigma = sigmas[sigma_idx].to(frames_z.device)
@@ -192,10 +203,14 @@ def sample(
     output_path = os.path.join(output_folder, experiment_name)
     os.makedirs(output_path, exist_ok=True)
 
-    basename = f"view{view_idx}_start{start_idx:03d}_frames{num_frames}"
+    basename = f"view{view_idx}_start{start_idx:03d}_frames{num_frames}_fsteps{30//(fps_id+1)}"
     basename += f"_steps{num_steps}_fps{fps_id}_motion{motion_bucket_id}_condaug{cond_aug}"
     basename += f"_inputaug{input_aug}_offsetnoise{offset_noise_level}_seed{seed}"
+    if img2img_strength is not None:
+        basename += f"_img2img{img2img_strength}"
     basename += f"_sigma{sigma_idx}v{sigma:.3f}"
+    if extra_str is not None:
+        basename += f"{extra_str}"
     basename = basename.replace(".", "d").replace("-", "n")
 
     input_image_path = os.path.join(output_path, f"{basename}_input.jpg")
@@ -205,7 +220,7 @@ def sample(
     input_video_path = os.path.join(output_path, f"{basename}_input.mp4")
 
     vid = (rearrange(samples, "t c h w -> t h w c") * 255).cpu().numpy().astype(np.uint8)
-    frames = (frames + 1.0 ) / 2.0
+    frames = (frames + 1.0) / 2.0
     inp = (rearrange(frames, "t c h w -> t h w c") * 255).cpu().numpy().astype(np.uint8)
 
     writer = imageio.get_writer(video_path, fps=fps_id + 1)

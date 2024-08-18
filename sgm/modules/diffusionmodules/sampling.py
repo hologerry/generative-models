@@ -77,7 +77,7 @@ class BaseDiffusionSampler:
 
 
 class SingleStepDiffusionSampler(BaseDiffusionSampler):
-    def sampler_step(self, sigma, next_sigma, denoiser, x, cond, uc, *args, **kwargs):
+    def sampler_step(self, *args, **kwargs):
         raise NotImplementedError
 
     def euler_step(self, x, d, dt):
@@ -93,7 +93,11 @@ class EDMSampler(SingleStepDiffusionSampler):
         self.s_tmax = s_tmax
         self.s_noise = s_noise
 
+    def possible_correction_step(self, *args, **kwargs):
+        raise NotImplementedError
+
     def sampler_step(self, sigma, next_sigma, denoiser, x, cond, uc=None, gamma=0.0):
+        # print(f"sigma: {sigma}, next_sigma: {next_sigma}, gamma: {gamma}")
         sigma_hat = sigma * (gamma + 1.0)
         if gamma > 0:
             eps = torch.randn_like(x) * self.s_noise
@@ -103,17 +107,20 @@ class EDMSampler(SingleStepDiffusionSampler):
         d = to_d(x, sigma_hat, denoised)
         dt = append_dims(next_sigma - sigma_hat, x.ndim)
 
-        euler_step = self.euler_step(x, d, dt)
-        x = self.possible_correction_step(euler_step, x, d, dt, next_sigma, denoiser, cond, uc)
+        euler_step_x = self.euler_step(x, d, dt)
+        x = self.possible_correction_step(euler_step_x, x, d, dt, next_sigma, denoiser, cond, uc)
         return x
 
     def __call__(self, denoiser, x, cond, uc=None, num_steps=None):
         x, s_in, sigmas, num_sigmas, cond, uc = self.prepare_sampling_loop(x, cond, uc, num_steps)
 
+        # print(f"num_sigmas: {num_sigmas}, s_in: {s_in}")
+
         for i in self.get_sigma_gen(num_sigmas):
             gamma = (
                 min(self.s_churn / (num_sigmas - 1), 2**0.5 - 1) if self.s_tmin <= sigmas[i] <= self.s_tmax else 0.0
             )
+            # print(f"sampler step {i}")
             x = self.sampler_step(
                 s_in * sigmas[i],
                 s_in * sigmas[i + 1],
@@ -197,7 +204,7 @@ class LinearMultistepSampler(BaseDiffusionSampler):
 
 
 class EulerEDMSampler(EDMSampler):
-    def possible_correction_step(self, euler_step, x, d, dt, next_sigma, denoiser, cond, uc):
+    def possible_correction_step(self, euler_step, *args, **kwargs):
         return euler_step
 
 

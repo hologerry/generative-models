@@ -23,7 +23,7 @@ class Guider(ABC):
 
 
 class VanillaCFG(Guider):
-    def __init__(self, scale: float):
+    def __init__(self, scale: float, *args, **kwargs):
         self.scale = scale
 
     def __call__(self, x: torch.Tensor, sigma: torch.Tensor) -> torch.Tensor:
@@ -85,7 +85,11 @@ class LinearPredictionGuider(Guider):
         return rearrange(x_u + scale * (x_c - x_u), "b t ... -> (b t) ...")
 
     def prepare_inputs(
-        self, x: torch.Tensor, s: torch.Tensor, c: dict, uc: dict
+        self,
+        x: torch.Tensor,
+        s: torch.Tensor,
+        c: dict,
+        uc: dict,
     ) -> Tuple[torch.Tensor, torch.Tensor, dict]:
         c_out = dict()
 

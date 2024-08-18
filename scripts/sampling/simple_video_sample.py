@@ -85,38 +85,38 @@ def sample(
     if version == "svd":
         num_frames = default(num_frames, 14)
         num_steps = default(num_steps, 25)
-        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample_svd/")
+        output_folder = default(output_folder, "simple_video_sample_svd/")
         model_config = "scripts/sampling/configs/svd.yaml"
     elif version == "svd_xt":
         num_frames = default(num_frames, 25)
         num_steps = default(num_steps, 30)
-        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample_svd_xt/")
+        output_folder = default(output_folder, "simple_video_sample_svd_xt/")
         model_config = "scripts/sampling/configs/svd_xt.yaml"
     elif version == "svd_xt_1_1":
         num_frames = default(num_frames, 25)
         num_steps = default(num_steps, 30)
-        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample_svd_xt_1_1/")
+        output_folder = default(output_folder, "simple_video_sample_svd_xt_1_1/")
         model_config = "scripts/sampling/configs/svd_xt_1_1.yaml"
     elif version == "svd_image_decoder":
         num_frames = default(num_frames, 14)
         num_steps = default(num_steps, 25)
-        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample_svd_image_decoder/")
+        output_folder = default(output_folder, "simple_video_sample_svd_image_decoder/")
         model_config = "scripts/sampling/configs/svd_image_decoder.yaml"
     elif version == "svd_xt_image_decoder":
         num_frames = default(num_frames, 25)
         num_steps = default(num_steps, 30)
-        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample_svd_xt_image_decoder/")
+        output_folder = default(output_folder, "simple_video_sample_svd_xt_image_decoder/")
         model_config = "scripts/sampling/configs/svd_xt_image_decoder.yaml"
     elif version == "sv3d_u":
         num_frames = 21
         num_steps = default(num_steps, 50)
-        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample_sv3d_u/")
+        output_folder = default(output_folder, "simple_video_sample_sv3d_u/")
         model_config = "scripts/sampling/configs/sv3d_u.yaml"
         cond_aug = 1e-5
     elif version == "sv3d_p":
         num_frames = 21
         num_steps = default(num_steps, 50)
-        output_folder = default(output_folder, "/data/Dynamics/sgm_outputs/simple_video_sample_sv3d_p/")
+        output_folder = default(output_folder, "simple_video_sample_sv3d_p/")
         model_config = "scripts/sampling/configs/sv3d_p.yaml"
         cond_aug = 1e-5
         if isinstance(elevations_deg, float) or isinstance(elevations_deg, int):
@@ -286,7 +286,9 @@ def sample(
             basename = os.path.basename(input_img_path).split(".")[0]
             if extra_str is not None:
                 basename += f"_{extra_str}"
-            basename += f"_nframes{num_frames}_steps{num_steps}_fps{fps_id}_motion{motion_bucket_id}_condaug{cond_aug:.3f}_seed{seed}"
+            if num_frames != 25:
+                basename += f"_nframes{num_frames}"
+            basename += f"_steps{num_steps}_fps{fps_id}_motion{motion_bucket_id}_condaug{cond_aug}_seed{seed}"
             basename = basename.replace(".", "d").replace("-", "n").replace("last_", "")
 
             input_image.save(os.path.join(output_folder, f"{basename}_input.jpg"))

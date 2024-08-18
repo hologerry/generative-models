@@ -11,6 +11,16 @@ model:
         scaling_config:
           target: sgm.modules.diffusionmodules.denoiser_scaling.VScalingWithEDMcNoise
 
+    # denoiser_config:
+    #   target: sgm.modules.diffusionmodules.denoiser.DiscreteDenoiser
+    #   params:
+    #     num_idx: 1000
+
+    #     scaling_config:
+    #       target: sgm.modules.diffusionmodules.denoiser_scaling.EpsScaling
+    #     discretization_config:
+    #       target: sgm.modules.diffusionmodules.discretizer.LegacyDDPMDiscretization
+
     network_config:
       target: sgm.modules.diffusionmodules.video_model.VideoUNet
       params:
@@ -144,3 +154,16 @@ model:
           params:
             max_scale: 3.0
             min_scale: 1.5
+
+    # sampler_config:
+    #   target: sgm.modules.diffusionmodules.sampling.EulerEDMSampler
+    #   params:
+    #     num_steps: 50
+
+    #     discretization_config:
+    #       target: sgm.modules.diffusionmodules.discretizer.LegacyDDPMDiscretization
+
+    #     guider_config:
+    #       target: sgm.modules.diffusionmodules.guiders.VanillaCFG
+    #       params:
+    #         scale: 7.5

@@ -12,6 +12,7 @@ from omegaconf import ListConfig
 from PIL import Image
 from torch import autocast
 
+from sgm.modules.diffusionmodules.discretizer import Discretization
 from sgm.util import append_dims
 
 
@@ -77,7 +78,7 @@ class Img2ImgDiscretizationWrapper:
         strength: float between 0.0 and 1.0. 1.0 means full sampling (all sigmas are returned)
     """
 
-    def __init__(self, discretization, strength: float = 1.0):
+    def __init__(self, discretization: Discretization, strength: float = 1.0):
         self.discretization = discretization
         self.strength = strength
         assert 0.0 <= self.strength <= 1.0

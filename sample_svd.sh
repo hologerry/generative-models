@@ -1,11 +1,12 @@
 #!/bin/sh
 {
 python scripts/sampling/simple_video_sample.py \
-    --input_path /data/Dynamics/gaussian_fluid_dynamics_log/gaussian_pbd_fluid_scalar_sim_rec_simple/gpf_basic_siminrec_simple_gascsprat_velnn_velgascsprat_l2gascs_lcurdist01_lexyz01_dur90_fut90_sol5_p01d5_emitfirstymoremore_decayp030/training_render_for_generative_svd/render_frame090_train01_last.png \
+    --input_path /data/Dynamics/gaussian_fluid_dynamics_log/gaussian_pbd_fluid_scalar_sim_rec_simple/gpf_basic_siminrec_simple_gascsprat_velnn_velgascsprat_l2gascs_lcurdist01_lexyz01_dur90_fut90_sol5_p01d5_emitfirstymoremore_decayp030/training_render_for_generative_svd/render_frame090_train00_last.png \
+    --output_folder /data/Dynamics/sgm_outputs/simple_video_sample_svd_xt_1_1/ \
     --num_frames 25 \
     --seed 23 \
-    --motion_bucket_id 31 \
-    --fps_id 29 \
+    --motion_bucket_id 127 \
+    --fps_id 6 \
     --version svd_xt_1_1
 exit
 }
