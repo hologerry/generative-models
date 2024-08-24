@@ -17,13 +17,14 @@ from PIL import Image
 
 sys.path.append(os.path.realpath(os.path.join(os.path.dirname(__file__), "../../")))
 
+from scripts.demo.discretization import Img2ImgDiscretizationWrapper
 from scripts.demo.svd_helpers import (
     get_batch,
     get_unique_embedder_keys_from_conditioner,
     load_model,
 )
 from sgm.util import append_dims, default
-from scripts.demo.discretization import Img2ImgDiscretizationWrapper
+
 
 def load_frames(frame_dir, start_frame_idx=90, num_frames=90, view_idx=0, fps=30):
     frames = []
@@ -98,7 +99,9 @@ def sample(
 
     if img2img_strength is not None:
         print(f"Wrapping {model.sampler.__class__.__name__} with Img2ImgDiscretizationWrapper")
-        model.sampler.discretization = Img2ImgDiscretizationWrapper(model.sampler.discretization, strength=img2img_strength)
+        model.sampler.discretization = Img2ImgDiscretizationWrapper(
+            model.sampler.discretization, strength=img2img_strength
+        )
 
     torch.manual_seed(seed)
     print("Model loaded.")
@@ -230,11 +233,11 @@ def sample(
     os.makedirs(video_frame_path, exist_ok=True)
     for i in range(num_frames):
         imageio.imwrite(
-            os.path.join(video_frame_path, f"{basename}_output_{i:02d}.jpg"),
+            os.path.join(video_frame_path, f"output_{i:02d}.png"),
             vid[i],
         )
         imageio.imwrite(
-            os.path.join(video_frame_path, f"{basename}_input_{i:02d}.jpg"),
+            os.path.join(video_frame_path, f"input_{i:02d}.png"),
             inp[i],
         )
         writer.append_data(vid[i])
